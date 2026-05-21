@@ -156,8 +156,7 @@ def run(problem: str, job_id: str, optimizer: str):
 
     space_dict = {"nsga2": suprb_ES_NSGA2_space, "nsga3": suprb_ES_NSGA3_space, "spea2": suprb_ES_SPEA2_space}
 
-    # WICHTIG: Der Experiment-Name MUSS exakt so aufgebaut sein wie von deinem Auswertungsskript erwartet,
-    # damit das Matching über "Baseline nsga2" etc. funktioniert!
+
     experiment_name = f"Baseline {optimizer}"
     print(f"MLflow Experiment: {experiment_name}")
     
@@ -178,8 +177,7 @@ def run(problem: str, job_id: str, optimizer: str):
     if hasattr(mlflow, "optuna"):
         mlflow.optuna.autolog()
 
-    # WICHTIG: Der Run-Name MUSS den Namen des Problems/Datasets enthalten, 
-    # da dein Auswertungsskript mit .str.contains(dataset) danach filtert!
+
     run_name_for_mlflow = f"{experiment_name}_{problem}_j{job_id}"
 
     with mlflow.start_run(run_name=run_name_for_mlflow):
