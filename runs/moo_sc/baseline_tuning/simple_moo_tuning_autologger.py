@@ -156,9 +156,12 @@ def run(problem: str, job_id: str, optimizer: str):
 
     space_dict = {"nsga2": suprb_ES_NSGA2_space, "nsga3": suprb_ES_NSGA3_space, "spea2": suprb_ES_SPEA2_space}
 
-    experiment_name = f"Baseline {optimizer} j:{job_id} p:{problem}"
-    print(experiment_name)
-    experiment = Experiment(name=experiment_name, verbose=10)
+    # WICHTIG: Der Experiment-Name MUSS exakt so aufgebaut sein wie von deinem Auswertungsskript erwartet,
+    # damit das Matching über "Baseline nsga2" etc. funktioniert!
+    experiment_name = f"Baseline {optimizer}"
+    print(f"MLflow Experiment: {experiment_name}")
+    
+    experiment = Experiment(name=f"{experiment_name} j:{job_id} p:{problem}", verbose=10)
 
     tuner = OptunaTuner(X_train=X, y_train=y, **tuning_params)
     experiment.with_tuning(space_dict[optimizer], tuner=tuner)
@@ -168,21 +171,23 @@ def run(problem: str, job_id: str, optimizer: str):
 
     evaluation = MOOCrossValidate(estimator=estimator, X=X, y=y, random_state=random_state, verbose=10)
 
-
+    # MLflow vorbereiten
     mlflow.set_experiment(experiment_name)
-
-
-    mlflow.sklearn.autolog(log_models=True)
+    mlflow.sklearn.autolog(log_models=True, exclusive=False) # exclusive=False ist wichtig für n_jobs=8
     
-
     if hasattr(mlflow, "optuna"):
         mlflow.optuna.autolog()
 
+    # WICHTIG: Der Run-Name MUSS den Namen des Problems/Datasets enthalten, 
+    # da dein Auswertungsskript mit .str.contains(dataset) danach filtert!
+    run_name_for_mlflow = f"{experiment_name}_{problem}_j{job_id}"
 
-    with mlflow.start_run(run_name="Tuning_and_Evaluation"):
+    with mlflow.start_run(run_name=run_name_for_mlflow):
         
-        # Tags für Meta-Infos setzen (sehr nützlich im MLflow Dashboard)
+        
         mlflow.set_tags({
+            "fold": "True",
+            "root": "True",
             "problem": problem,
             "job_id": job_id,
             "optimizer": optimizer,
@@ -191,18 +196,30 @@ def run(problem: str, job_id: str, optimizer: str):
 
         experiment.perform(evaluation, cv=ShuffleSplit(n_splits=8, test_size=0.25, random_state=random_state), n_jobs=8)
 
-
         if hasattr(experiment, "results_"):
-
             metrics_to_log = {}
-            for key, value in experiment.results_.items():
-                if isinstance(value, (int, float, np.number)):
-                    metrics_to_log[key] = float(value)
-                elif isinstance(value, list) and all(isinstance(v, (int, float, np.number)) for v in value):
-                    metrics_to_log[f"{key}_mean"] = float(np.mean(value))
+            
+            mapping = {
+                "test_neg_mean_squared_error": "test_neg_mean_squared_error",
+                "elitist_complexity": "elitist_complexity",
+                "hypervolume": "hypervolume",
+                "sc_iterations": "sc_iterations",
+                "spread": "spread",
+                "test_hypervolume": "test_hypervolume"
+            }
+            
+            for src_key, target_key in mapping.items():
+                if src_key in experiment.results_:
+                    val = experiment.results_[src_key]
+                    if isinstance(val, (list, np.ndarray)):
+                        metrics_to_log[target_key] = float(np.mean(val))
+                    else:
+                        metrics_to_log[target_key] = float(val)
+            
             mlflow.log_metrics(metrics_to_log)
+
         if hasattr(experiment, "tuned_params_") and experiment.tuned_params_:
-            mlflow.log_params({f"best_{k}": str(v) for k, v in experiment.tuned_params_.items()})
+            mlflow.log_param("tuned_params", str(experiment.tuned_params_))
 
 
 if __name__ == "__main__":

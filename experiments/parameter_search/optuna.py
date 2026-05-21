@@ -52,11 +52,11 @@ class OptunaTuner(ParameterTuner):
 
         sampler = self._get_optimizer(self.tuner)(seed=self.random_state)
 
-        storage_name = f'sqlite:///suprb_optuna_{datetime.now().strftime("%Y-%m-%d")}.db'
+        storage_name = "sqlite:///suprb_optuna.db"
         study = optuna.create_study(
             sampler=sampler,
             study_name=self.study_name,
-            # storage=storage_name,
+            storage=storage_name,
             load_if_exists=True,
         )
 
