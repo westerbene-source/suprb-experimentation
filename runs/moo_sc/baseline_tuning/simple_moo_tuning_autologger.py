@@ -172,11 +172,11 @@ def run(problem: str, job_id: str, optimizer: str):
     mlflow.set_experiment(experiment_name)
 
 
-    mlflow.sklearn.autologging(log_models=True)
+    mlflow.sklearn.autolog(log_models=True)
     
 
     if hasattr(mlflow, "optuna"):
-        mlflow.optuna.autologging()
+        mlflow.optuna.autolog()
 
 
     with mlflow.start_run(run_name="Tuning_and_Evaluation"):
