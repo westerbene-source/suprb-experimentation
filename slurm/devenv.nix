@@ -1,33 +1,37 @@
-{ pkgs, ... }:
-
-let
-  python = pkgs.python312;
-in
 {
-  packages = [
-    python
-    pkgs.git
-    pkgs.gcc
+  pkgs,
+  lib,
+  config,
+  inputs,
+  ...
+}: {
+  packages = with pkgs; [
+    gcc
+    gccStdenv.cc.cc.lib
+    libz
   ];
 
-  languages.python = {
-    enable = true;
-    package = python;
+  languages = {
+        python = {
+            # If you don't need Python, comment this out:
+            enable = true;
 
-    venv.enable = true;
+            # Choose your Python version:
+            
+            version = "3.12.11"; # Use this only if you need a specific patch version, may build from source
 
-    pip.enable = true;
 
-    pip.install = ''
-      pip install -r ../requirements.txt
-    '';
-  };
+            # Use venv and requirements.txt:
+            venv = {
+                enable = true;
+                requirements = ../requirements.txt; # Create this yourself
+            };
+        };
+    };
 
-  env = {
-    PYTHONPATH = "../src:..";
 
-    MPLBACKEND = "Agg";
-
-    MLFLOW_TRACKING_URI = "file:../mlruns";
-  };
+  env.LD_LIBRARY_PATH = lib.makeLibraryPath [
+    pkgs.stdenv.cc.cc.lib
+    pkgs.zlib
+  ];
 }
