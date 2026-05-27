@@ -80,7 +80,7 @@ nix develop ./slurm --no-pure-eval --command pg_ctl -D "$PG_DATA" -o "-k $PG_SOC
 sleep 3
 
 # Erstelle die Standard-Datenbank (falls Optuna sie unter dem System-Usernamen erwartet)
-nix develop ./slurm --no-pure-eval --command createdb -h "$PG_SOCKET_DIR" "$USER" 2>/dev/null || true
+nix develop ./slurm --no-pure-eval --command createdb -h "$PG_SOCKET_DIR" optuna_db
 
 # -------------------------------------------------------------------------------
 # 3. EXPERIMENT AUSFÜHREN
