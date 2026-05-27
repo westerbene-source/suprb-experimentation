@@ -192,7 +192,7 @@ def run(problem: str, job_id: str, optimizer: str):
             "framework": "SupRB"
         })
 
-        experiment.perform(evaluation, cv=ShuffleSplit(n_splits=8, test_size=0.25, random_state=random_state), n_jobs=8)
+        experiment.perform(evaluation, cv=ShuffleSplit(n_splits=8, test_size=0.25, random_state=random_state), n_jobs=1)
 
         if hasattr(experiment, "results_"):
             metrics_to_log = {}

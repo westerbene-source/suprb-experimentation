@@ -1,5 +1,5 @@
 from typing import Union, Callable, Any
-
+import os
 import numpy as np
 import optuna
 from sklearn.base import BaseEstimator
@@ -52,19 +52,26 @@ class OptunaTuner(ParameterTuner):
 
         sampler = self._get_optimizer(self.tuner)(seed=self.random_state)
 
-        storage_name = "sqlite:///suprb_optuna.db"
+        # VERBESSERUNG: PostgreSQL statt SQLite verwenden
+        
+        # Falls lokal via Devenv gestartet, nutzen wir den Unix-Socket-Pfad
+        scratch_path = os.environ.get("SCRATCH")
+        devenv_state = os.environ.get("DEVENV_STATE")
+
+        if scratch_path:
+            # Für die Ausführung im Slurm-Array (isoliert im Scratch des Tasks)
+            storage_url = f"postgresql+psycopg2:///optuna_db?host={scratch_path}/postgres"
+        elif devenv_state:
+            # Lokal auf dem Login-Knoten via Devenv Shell
+            storage_url = f"postgresql+psycopg2:///optuna_db?host={devenv_state}/postgres"
+        else:
+            storage_url = "postgresql+psycopg2://localhost/optuna_db"
+
         study = optuna.create_study(
             sampler=sampler,
             study_name=self.study_name,
-            storage=storage_name,
+            storage=storage_url,  # Hier wird die Postgres-URL übergeben
             load_if_exists=True,
-        )
-
-        study.optimize(
-            func=objective,
-            n_trials=self.n_calls,
-            n_jobs=self.n_jobs if self.n_jobs is not None else 1,
-            timeout=self.timeout,
         )
 
         self.tuned_params_ = parameter_space(study.best_trial)

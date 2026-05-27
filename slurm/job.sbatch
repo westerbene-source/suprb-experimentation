@@ -4,8 +4,8 @@
 ###############################################################################
 #SBATCH --time=96:00:00                 # 96h wall‑clock limit
 #SBATCH --partition=cpu                 # Passende Partition für compute05
-#SBATCH --nodelist=oc-compute04         # Ziel-Node auf compute05 geändert
-#SBATCH --cpus-per-task=5              # 5 CPUs per array task
+#SBATCH --nodelist=oc-compute03         # Ziel-Node auf compute03 geändert
+#SBATCH --cpus-per-task=8              # 8 CPUs per array task
 #SBATCH --mem=50G                      # 50 GiB RAM per array task
 #SBATCH --output=output/%A_%a.out      # stdout file
 #SBATCH --error=output/%A_%a.err       # stderr file
@@ -21,7 +21,7 @@ trap 'echo "[$(date)] Trap ausgelöst..."; save_results "$SCRATCH" ~"/results/sw
 
 PROJECT_DIR="/home/$USER/suprb-experimentation"
 export PYTHONPATH="${PYTHONPATH}:${PROJECT_DIR}"
-EXPERIMENT="runs/moo_sc/baseline_tuning/simple_moo_tuning.py"
+EXPERIMENT="runs/moo_sc/baseline_tuning/simple_moo_tuning_autologger.py"
 OPTIMIZER="nsga2"
 
 datasets=(
@@ -53,9 +53,15 @@ else
     while [ ! -f "${PROJECT_DIR}/.devenv_ready" ]; do
         sleep 2
     done
-    # Ein kleiner zusätzlicher Versatz, damit nicht alle im selben Sekundenbruchteil zugreifen
+    # Ein kleiner zusätzlicher Versatz
     sleep $(( SLURM_ARRAY_TASK_ID * 2 ))
 fi
+
+
+mkdir -p "$SCRATCH/postgres"
+
+# Trickst Devenv aus: Teilt dem Dienst mit, seinen Zustand samt UNIX-Socket dorthin zu legen.
+export DEVENV_STATE="$SCRATCH"
 
 # Jetzt rufen wir den Python-Befehl auf
 nix develop ./slurm --no-pure-eval --command env PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH}" python "${PROJECT_DIR}/${EXPERIMENT}" \
