@@ -16,7 +16,7 @@
 
 source /projects/shared/lib/slurm-utils.sh
 
-
+# Die Trap sichert am Ende alles
 trap 'echo "[$(date)] Trap ausgelöst..."; save_results "$SCRATCH" ~"/results/sweep-$SLURM_ARRAY_JOB_ID/task-$SLURM_ARRAY_TASK_ID"' EXIT ERR SIGTERM
 
 PROJECT_DIR="/home/$USER/suprb-experimentation"
@@ -37,53 +37,67 @@ study_name="${OPTIMIZER} Tuning - ${dataset}"
 
 echo "[$(date)] Tuning optimizer '${OPTIMIZER}' on dataset '${dataset}' (array task ${SLURM_ARRAY_TASK_ID})"
 
+# Zufälliger Versatz beim Start
 sleep $(( RANDOM % 21 ))
 
 cd "${PROJECT_DIR}"
 
+# -------------------------------------------------------------------------------
+# 1. UMGEBUNG PHASENWEISE VORBEREITEN
+# -------------------------------------------------------------------------------
 if [ "$SLURM_ARRAY_TASK_ID" -eq 0 ]; then
     echo "[$(date)] Task 0 baut die Devenv-Umgebung exklusiv vor..."
-    # Initialisiert die Umgebung einmal komplett isoliert
     nix develop ./slurm --no-pure-eval --command python --version
-    # Erstellt eine temporäre Flagge, dass alles fertig ist
     touch "${PROJECT_DIR}/.devenv_ready"
 else
     echo "[$(date)] Task ${SLURM_ARRAY_TASK_ID} wartet auf die Umgebung..."
-    # Alle anderen Tasks warten, bis Task 0 fertig ist
     while [ ! -f "${PROJECT_DIR}/.devenv_ready" ]; do
         sleep 2
     done
-    # Ein kleiner zusätzlicher Versatz
     sleep $(( SLURM_ARRAY_TASK_ID * 2 ))
 fi
 
+# -------------------------------------------------------------------------------
+# 2. NATIVE POSTGRESQL INSTANZ IM SCRATCH INITIALISIEREN & STARTEN
+# -------------------------------------------------------------------------------
+PG_DATA="$SCRATCH/postgres_data"
+PG_SOCKET_DIR="$SCRATCH/postgres"
 
-mkdir -p "$SCRATCH/postgres"
+mkdir -p "$PG_DATA"
+mkdir -p "$PG_SOCKET_DIR"
 
+# Trickst Optuna/SQLAlchemy aus, damit es den Socket im richtigen Ordner sucht
 export DEVENV_STATE="$SCRATCH"
 
-echo "[$(date)] Starte isolierte PostgreSQL-Instanz im Hintergrund für Task ${SLURM_ARRAY_TASK_ID}..."
-# Startet die Devenv-Prozesse (Postgres) asynchron im Hintergrund
-nix develop ./slurm --no-pure-eval --command devenv processes up &
-PID_POSTGRES=$!
+echo "[$(date)] Initialisiere native PostgreSQL-Datenbank in $PG_DATA..."
+nix develop ./slurm --no-pure-eval --command initdb -D "$PG_DATA" --no-locale --auth=trust
 
-echo "[$(date)] Warte auf PostgreSQL-Initialisierung..."
-sleep 8
+echo "[$(date)] Starte PostgreSQL-Server n लिह..."
+# Wir starten postgres nativ, lauschen NUR auf dem UNIX-Socket im Scratch (kein TCP-Port-Konflikt!)
+nix develop ./slurm --no-pure-eval --command pg_ctl -D "$PG_DATA" -o "-k $PG_SOCKET_DIR -h ''" start
 
-# Trickst Devenv aus: Teilt dem Dienst mit, seinen Zustand samt UNIX-Socket dorthin zu legen.
-export DEVENV_STATE="$SCRATCH"
+# Dem Server 3 Sekunden Zeit geben, um den Socket zu erstellen
+sleep 3
 
-# Jetzt rufen wir den Python-Befehl auf
+# Erstelle die Standard-Datenbank (falls Optuna sie unter dem System-Usernamen erwartet)
+nix develop ./slurm --no-pure-eval --command createdb -h "$PG_SOCKET_DIR" "$USER" 2>/dev/null || true
+
+# -------------------------------------------------------------------------------
+# 3. EXPERIMENT AUSFÜHREN
+# -------------------------------------------------------------------------------
+echo "[$(date)] Starte Python-Experiment..."
 nix develop ./slurm --no-pure-eval --command env PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH}" python "${PROJECT_DIR}/${EXPERIMENT}" \
     -p "${dataset}" \
     -j "${SLURM_ARRAY_JOB_ID}" \
     -o "${OPTIMIZER}"
 
+# -------------------------------------------------------------------------------
+# 4. SAUBERES HERUNTERFAHREN
+# -------------------------------------------------------------------------------
+echo "[$(date)] Stoppe PostgreSQL-Server..."
+nix develop ./slurm --no-pure-eval --command pg_ctl -D "$PG_DATA" stop -m fast
 
-kill $PID_POSTGRES
-wait $PID_POSTGRES 2>/dev/null
-
-# Am Ende räumt Task 0 die Flagge wieder auf
+# Am Ende räumt Task 0 das Readiness-Flag auf
 if [ "$SLURM_ARRAY_TASK_ID" -eq 0 ]; then
     rm -f "${PROJECT_DIR}/.devenv_ready"
 fi
