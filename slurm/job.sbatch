@@ -60,6 +60,16 @@ fi
 
 mkdir -p "$SCRATCH/postgres"
 
+export DEVENV_STATE="$SCRATCH"
+
+echo "[$(date)] Starte isolierte PostgreSQL-Instanz im Hintergrund für Task ${SLURM_ARRAY_TASK_ID}..."
+# Startet die Devenv-Prozesse (Postgres) asynchron im Hintergrund
+nix develop ./slurm --no-pure-eval --command devenv processes up &
+PID_POSTGRES=$!
+
+echo "[$(date)] Warte auf PostgreSQL-Initialisierung..."
+sleep 8
+
 # Trickst Devenv aus: Teilt dem Dienst mit, seinen Zustand samt UNIX-Socket dorthin zu legen.
 export DEVENV_STATE="$SCRATCH"
 
@@ -69,7 +79,13 @@ nix develop ./slurm --no-pure-eval --command env PYTHONPATH="${PROJECT_DIR}:${PY
     -j "${SLURM_ARRAY_JOB_ID}" \
     -o "${OPTIMIZER}"
 
+
+kill $PID_POSTGRES
+wait $PID_POSTGRES 2>/dev/null
+
 # Am Ende räumt Task 0 die Flagge wieder auf
 if [ "$SLURM_ARRAY_TASK_ID" -eq 0 ]; then
     rm -f "${PROJECT_DIR}/.devenv_ready"
 fi
+
+echo "[$(date)] Task ${SLURM_ARRAY_TASK_ID} erfolgreich beendet."
