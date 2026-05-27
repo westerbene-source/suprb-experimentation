@@ -9,7 +9,6 @@
     gcc
     gccStdenv.cc.cc.lib
     libz
-    psycopg2-binary
   ];
 
   languages = {
