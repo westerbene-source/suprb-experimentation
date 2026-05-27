@@ -74,6 +74,13 @@ class OptunaTuner(ParameterTuner):
             load_if_exists=True,
         )
 
+        study.optimize(
+            func=objective,
+            n_trials=self.n_calls,
+            n_jobs=self.n_jobs if self.n_jobs is not None else 1,
+            timeout=self.timeout,
+        )
+
         self.tuned_params_ = parameter_space(study.best_trial)
 
         self.tuning_result_ = Bunch()
