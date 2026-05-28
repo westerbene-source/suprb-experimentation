@@ -4,11 +4,11 @@
 #SBATCH --output=output/output-%j.txt
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=20G
-#SBATCH --nodelist=oc-compute03
+#SBATCH --nodelist=oc-compute04
 
 JOB_DIR=/data/oc-compute03/$USER/suprb-experimentation
 export PYTHONPATH=${PYTHONPATH}:${JOB_DIR}
-experiment="runs/comparisons/suprb_all_tuning.py"
+experiment="runs/comparisons/suprb_tuning.py"
 dataset="airfoil_self_noise"
 study_name="SupRB-Airfoil"
 
