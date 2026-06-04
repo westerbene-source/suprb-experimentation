@@ -17,9 +17,9 @@
 ###############################################################################
 #SBATCH --job-name=suprb_worker
 #SBATCH --partition=cpu
-#SBATCH --nodelist=oc-compute03
+#SBATCH --nodelist=oc-compute04
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=12G
+#SBATCH --mem=8G
 #SBATCH --time=80:00:00
 #SBATCH --output=output/worker_%A_%a.out
 #SBATCH --error=output/worker_%A_%a.err

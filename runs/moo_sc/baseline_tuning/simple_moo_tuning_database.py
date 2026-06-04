@@ -111,7 +111,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
                                  f"{optimizer}_tuning_{problem}_job{job_id}")
 
 
-    trials_per_worker = 5
+    trials_per_worker = 40
 
  
     timeout_seconds = int(os.environ.get("WORKER_TIMEOUT", 60 * 60 * 24 * 3))
@@ -124,7 +124,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
         estimator=estimator,
         random_state=worker_random_state,
         cv=4,
-        n_jobs_cv=4,
+        n_jobs_cv=1,
         n_jobs=1,                     # one trial at a time per worker; workers parallelise instead
         n_calls=trials_per_worker,
         timeout=timeout_seconds if not sys.gettrace() else 60,
@@ -199,8 +199,8 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
     tuner = OptunaTuner(X_train=X, y_train=y, **tuning_params)
     experiment.with_tuning(space_dict[optimizer], tuner=tuner)
 
-    random_states = np.random.SeedSequence(worker_random_state).generate_state(8)
-    experiment.with_random_states(random_states, n_jobs=4)
+    random_states = np.random.SeedSequence(worker_random_state).generate_state(1)
+    experiment.with_random_states(random_states, n_jobs=1)
 
     evaluation = MOOCrossValidate(
         estimator=estimator, X=X, y=y,
@@ -209,7 +209,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
     experiment.perform(
         evaluation,
         cv=ShuffleSplit(n_splits=8, test_size=0.25, random_state=worker_random_state),
-        n_jobs=4,
+        n_jobs=1,
     )
 
     mlflow.set_experiment(experiment_name)
