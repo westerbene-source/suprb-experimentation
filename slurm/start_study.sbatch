@@ -10,7 +10,7 @@
 #   5. Shuts down PostgreSQL cleanly
 #
 # Usage:
-#   sbatch slurm/start_study.sbatch --optimizer nsga2 --dataset airfoil_self_noise --n-workers 16
+#   sbatch slurm/start_study.sbatch --optimizer spea2 --dataset airfoil_self_noise --n-workers 16
 #
 # Or with defaults (see variables below):
 #   sbatch slurm/start_study.sbatch
@@ -18,8 +18,8 @@
 #SBATCH --job-name=study_coordinator
 #SBATCH --partition=cpu
 #SBATCH --nodelist=oc-compute03
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=4G
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G
 #SBATCH --time=100:00:00
 #SBATCH --output=output/coordinator_%j.out
 #SBATCH --error=output/coordinator_%j.err

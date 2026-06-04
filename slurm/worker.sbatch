@@ -18,7 +18,7 @@
 #SBATCH --job-name=suprb_worker
 #SBATCH --partition=cpu
 #SBATCH --nodelist=oc-compute03
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=2
 #SBATCH --mem=12G
 #SBATCH --time=80:00:00
 #SBATCH --output=output/worker_%A_%a.out
@@ -29,7 +29,7 @@ source /projects/shared/lib/slurm-utils.sh
 
 PROJECT_DIR="/home/$USER/suprb-experimentation"
 export PYTHONPATH="${PYTHONPATH}:${PROJECT_DIR}"
-EXPERIMENT="runs/moo_sc/baseline_tuning/simple_moo_tuning_autologger.py"
+EXPERIMENT="runs/moo_sc/baseline_tuning/simple_moo_tuning_database.py"
 
 # Save results to per-worker scratch, then copy to shared results on exit
 trap '
