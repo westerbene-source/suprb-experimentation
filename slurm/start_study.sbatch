@@ -113,7 +113,6 @@ optuna.create_study(
     study_name="${STUDY_NAME}",
     storage="${STORAGE_URL}",
     load_if_exists=True,
-    direction="maximize",
 )
 print("Study '${STUDY_NAME}' created/confirmed in storage.")
 PYEOF
