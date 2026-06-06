@@ -119,7 +119,8 @@ def log_tuning(experiment: Experiment):
 
     # Log history
     for step, objective_value in enumerate(tuning_result.objective_history):
-        mlflow.log_metric("objective_function", objective_value, step=step)
+        if objective_value is not None:
+            mlflow.log_metric("objective_function", objective_value, step=step)
 
     history = _expand_list(tuning_result.params_history)
 
