@@ -192,7 +192,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
         "spea2": suprb_ES_SPEA2_space,
     }
 
-    experiment_name = f"Baseline {optimizer} j:{job_id} w:{worker_id} p:{problem}"
+    experiment_name = f"Baseline {optimizer} j:{job_id} p:{problem}"
     print(experiment_name)
     experiment = Experiment(name=experiment_name, verbose=10)
 
