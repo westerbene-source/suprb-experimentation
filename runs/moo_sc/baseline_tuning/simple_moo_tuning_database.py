@@ -98,7 +98,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
             origin_generation=origin.SquaredError(),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=64,
+        n_iter=32,
         n_rules=8,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
