@@ -99,7 +99,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=16,
-        n_rules=8,
+        n_rules=2,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=worker_random_state,
