@@ -55,11 +55,10 @@ class OptunaTuner(ParameterTuner):
         Fallback storage resolution when no explicit URL was passed.
 
         Priority:
-          1. OPTUNA_STORAGE   — set by worker.sbatch (most explicit)
-          2. PG_SOCKET_DIR    — set by coordinator for local/interactive use
-          3. SCRATCH          — legacy: old per-task postgres in scratch
-          4. DEVENV_STATE     — legacy: local devenv shell
-          5. localhost        — last resort
+          1. PG_SOCKET_DIR    — set by coordinator for local/interactive use
+          2. SCRATCH          — legacy: old per-task postgres in scratch
+          3. DEVENV_STATE     — legacy: local devenv shell
+          4. localhost        — last resort
         """
         url = os.environ.get("OPTUNA_STORAGE")
         if url:

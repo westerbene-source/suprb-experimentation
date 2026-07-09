@@ -148,7 +148,7 @@ def run_main():
     with open("logging_output_scripts/config.json", "r") as f:
         config = json.load(f)
 
-    config["datasets"] = saga_datasets if setting is not test else {"parkinson_total": "Parkinson's Telemonitoring"}
+    config["datasets"] = current_dataset
 
     config["output_directory"] = setting[0]
     if not os.path.isdir("diss-graphs/graphs"):
@@ -168,9 +168,9 @@ def run_main():
 
     time.sleep(10)
 
-    if config["data_directory"] == "mlruns":
-        all_runs_df = mlflow.search_runs(search_all_experiments=True)
-        filter_runs(all_runs_df)
+    
+    all_runs_df = mlflow.search_runs(search_all_experiments=True)
+    filter_runs(all_runs_df)
 
     if setting[0] == "diss-graphs/graphs/MOO-baseline":
         cohens_pairwise_d([("Baseline nsga2", "Baseline spea2"), ("Baseline nsga2", "Baseline nsga3"), ("Baseline nsga3", "Baseline spea2")],
@@ -240,8 +240,7 @@ if __name__ == '__main__':
     pop_size = ["diss-graphs/graphs/POP", pop_size, "Configuration", False, "mlruns_csv/POP"]
     more_rules = ["diss-graphs/graphs/MORE_RULES", more_rules, "Configuration", False, "mlruns_csv/MORE_RULES"]
     test = ["diss-graphs/graphs/TEST", test, "Configuration", False, "mlruns_csv/TEST"]
-    spea2_only = ["diss-graphs/graphs/SPEA2_ONLY", spea2_only, "Configuration", False, "mlruns_csv/SPEA2_ONLY",
-                  ga_baseline_more_tuning]
+    spea2_only = ["diss-graphs/graphs/SPEA2_ONLY", spea2_only, "Configuration", False, "mlruns_csv/SPEA2_ONLY"]
 
     # setting = ga_base
     # setting = test
@@ -249,17 +248,28 @@ if __name__ == '__main__':
     # setting = moo_sampler_all                 # Check
     # setting = moo_sampler_equi_proj           # Check
     # setting = moo_early_base_comp             # Check
-    setting = moo_early_no_base               # Check
+    # setting = moo_early_no_base               # Check
     # setting = moo_early_nsga2_spea2
     # setting = moo_early_only_spea2            # Check
     # setting = moo_ts_all                      # Check
     # setting = moo_ts_naive                    # Check
     # setting = pop_size
     # setting = more_rules
-    # setting = spea2_only
+    setting = spea2_only
 
-    mlruns_to_csv(saga_datasets if setting is not test else {"parkinson_total": "Parkinson's Telemonitoring"},
-                  subdir=setting[4].split("/")[-1], normalize=True)
+    current_dataset = {"airfoil_self_noise": "Airfoil Self-Noise"}
+
+    mlruns_to_csv(current_dataset,
+                subdir=setting[4].split("/")[-1], normalize=True)
+   
     run_main()
 
     print(f"\nFinished creating plots for {setting[4].split("/")[-1]}")
+
+
+   # "combined_cycle_power_plant": "Combined Cycle Power Plant",
+   # "airfoil_self_noise": "Airfoil Self-Noise",
+   # "concrete_strength": "Concrete Strength",
+   # "energy_cool": "Energy Efficiency Cooling",
+   # "protein_structure": "Physiochemical Properties of Protein Tertiary Structure",
+   # "parkinson_total": "Parkinson's Telemonitoring"

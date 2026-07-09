@@ -385,7 +385,7 @@ def plot_hexbin(
             algo_df["Pseudo Accuracy"],
             gridsize=gridsize,
             cmap="Blues" if plot_type == "test" else "Oranges",
-            extent=(0, 1, 0, 1) if len(moo_heuristics) != 1 else None,
+            extent=(0, 1, 0, 1),
             mincnt=1,
         )
         hb_list.append(hb)
