@@ -56,7 +56,10 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
     X, y = shuffle(X, y, random_state=random_state)
 
     model = SupRB(
-        rule_discovery=ns.NoveltySearch(
+        rule_discovery=es.ES1xLambda(
+            operator="&",
+            n_iter=1000,
+            delay=30,
             init=rule.initialization.MeanInit(
                 fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=random_state)
             ),
@@ -64,8 +67,8 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
             origin_generation=origin.SquaredError(),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=64,
-        n_rules=8,
+        n_iter=32,
+        n_rules=4,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=random_state,
