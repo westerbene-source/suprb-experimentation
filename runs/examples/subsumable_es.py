@@ -25,6 +25,7 @@ from suprb.logging.stdout import StdoutLogger
 from suprb.optimizer.solution import nsga2, nsga3, spea2
 from suprb.optimizer.rule import es, origin, mutation, ns
 from suprb.solution.initialization import RandomInit
+from suprb.rule.matching import OrderedBound, UnorderedBound, CenterSpread, MinPercentage
 import suprb.solution.mixing_model as mixing_model
 
 from problems import scale_X_y
@@ -46,6 +47,31 @@ def load_dataset(name: str, **kwargs) -> tuple[np.ndarray, np.ndarray]:
         return getattr(datasets, method_name)(**kwargs)
 
 
+def get_effective_bounds(match) -> np.ndarray:
+    if isinstance(match, OrderedBound):
+        return match.bounds
+
+    if isinstance(match, UnorderedBound):
+        lower = np.min(match.bounds, axis=1)
+        upper = np.max(match.bounds, axis=1)
+        return np.stack([lower, upper], axis=1)
+
+    if isinstance(match, CenterSpread):
+        lower = match.bounds[:, 0] - match.bounds[:, 1]
+        upper = match.bounds[:, 0] + match.bounds[:, 1]
+        return np.stack([lower, upper], axis=1)
+
+    if isinstance(match, MinPercentage):
+        lower = match.bounds[:, 0]
+        upper = lower + match.bounds[:, 1] * (1 - lower)
+        return np.stack([lower, upper], axis=1)
+
+
+def bounds_contains(outer_bounds: np.ndarray, inner_bounds: np.ndarray) -> bool:
+    return bool(
+        np.all(outer_bounds[:, 0] <= inner_bounds[:, 0])
+        and np.all(outer_bounds[:, 1] >= inner_bounds[:, 1])
+    )
 
 def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
 
@@ -67,8 +93,8 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
             origin_generation=origin.SquaredError(),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=32,
-        n_rules=4,
+        n_iter=64,
+        n_rules=8,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=random_state,
@@ -95,36 +121,42 @@ def pred_diff_on_overlap(containing_rule, contained_rule) -> np.ndarray:
 
 def analyze_pool(pool: list, tolerance: float = 0.0) -> pd.DataFrame:
     n = len(pool)
-    match_sets = [r.match_set_ for r in pool]
+    bounds = [get_effective_bounds(r.match) for r in pool]  
+    match_sets = [r.match_set_ for r in pool]                 
     errors = [r.error_ for r in pool]
- 
+
     records = []
     for i in range(n):
-        mask_i = match_sets[i]
+        bounds_i = bounds[i]
+        match_i = match_sets[i]
         for j in range(n):
             if i == j:
                 continue
-            mask_j = match_sets[j]
- 
-            if mask_j.sum() == 0:
+            bounds_j = bounds[j]
+            match_j = match_sets[j]
+
+            if match_j.sum() == 0:
                 continue  # degenerate rule, skip
- 
-            contains = np.all(mask_i[mask_j])
+
+            contains = bounds_contains(bounds_i, bounds_j)
             if not contains:
                 continue
- 
+
+            if not np.all(match_i[match_j]):
+                continue
+
             error_i, error_j = errors[i], errors[j]
             would_subsume = error_i <= error_j * (1 + tolerance)
- 
+
             diff = pred_diff_on_overlap(pool[i], pool[j])
- 
+
             records.append(
                 {
                     "i": i,
                     "j": j,
-                    "overlap_size": int(mask_j.sum()),
-                    "j_pool_size": int(mask_j.sum()),
-                    "i_pool_size": int(mask_i.sum()),
+                    "overlap_size": int(match_j.sum()),
+                    "j_pool_size": int(match_j.sum()),
+                    "i_pool_size": int(match_i.sum()),
                     "error_i": error_i,
                     "error_j": error_j,
                     "error_diff": error_i - error_j,
@@ -133,7 +165,7 @@ def analyze_pool(pool: list, tolerance: float = 0.0) -> pd.DataFrame:
                     "pred_diff_max_abs": float(np.max(np.abs(diff))),
                 }
             )
- 
+
     return pd.DataFrame.from_records(records)
 
 
