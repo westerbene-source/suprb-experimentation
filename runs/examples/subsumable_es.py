@@ -24,13 +24,14 @@ from suprb.logging.multi_objective import MOLogger
 from suprb.logging.stdout import StdoutLogger
 from suprb.optimizer.solution import nsga2, nsga3, spea2
 from suprb.optimizer.rule import es, origin, mutation, ns
+from suprb.rule.subsumption import PreferSmallerVolume
 from suprb.solution.initialization import RandomInit
 from suprb.rule.matching import OrderedBound, UnorderedBound, CenterSpread, MinPercentage
 import suprb.solution.mixing_model as mixing_model
 
 from problems import scale_X_y
 
-random_state = 42
+random_state = 43
 
 opt_dict = {
     "nsga2": nsga2.NonDominatedSortingGeneticAlgorithm2,
@@ -91,6 +92,7 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
+            subsumption=PreferSmallerVolume(tolerance=0.0),  
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=32,
@@ -99,7 +101,14 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=random_state,
     )
+
+
+
     model.fit(X, y)
+    print([r.numerosity_ for r in model.pool_])
+    print(model.rule_discovery_.subsumption)
+    print(len(model.pool_))
+    print(model.elitist_.genome.shape if hasattr(model.elitist_, "genome") else "check attribute name")
     return model
 
 def get_final_pool(model: SupRB) -> list:
@@ -200,7 +209,7 @@ def main():
     pool = get_final_pool(model)
  
     df = analyze_pool(pool, 0.00)
-    n_rules_in_pool = max(df["i"].max(), df["j"].max()) + 1
+    n_rules_in_pool = len(pool)
     summarize(df, n_rules_in_pool=n_rules_in_pool)
  
     out_path = "output/subsumption_pairs_airfoil.csv"
