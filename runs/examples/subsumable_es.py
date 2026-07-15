@@ -93,8 +93,8 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
             origin_generation=origin.SquaredError(),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=64,
-        n_rules=8,
+        n_iter=32,
+        n_rules=4,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=random_state,
@@ -199,7 +199,7 @@ def main():
     model = run_single_cycle("airfoil_self_noise", "NA", "spea2")
     pool = get_final_pool(model)
  
-    df = analyze_pool(pool, 0.05)
+    df = analyze_pool(pool, 0.00)
     n_rules_in_pool = max(df["i"].max(), df["j"].max()) + 1
     summarize(df, n_rules_in_pool=n_rules_in_pool)
  
