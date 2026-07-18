@@ -17,6 +17,7 @@ from experiments.mlflow import log_experiment
 from experiments.parameter_search import param_space
 from experiments.parameter_search.optuna import OptunaTuner
 from problems import scale_X_y
+import time
 
 from suprb import rule, SupRB
 from suprb.logging.combination import CombinedLogger
@@ -24,7 +25,7 @@ from suprb.logging.multi_objective import MOLogger
 from suprb.logging.stdout import StdoutLogger
 from suprb.optimizer.solution import nsga2, nsga3, spea2
 from suprb.optimizer.rule import es, origin, mutation, ns
-from suprb.rule.subsumption import PreferSmallerVolume
+from suprb.rule.subsumption import PreferSmallerVolume, PreferLargerVolume
 from suprb.solution.initialization import RandomInit
 from suprb.rule.matching import OrderedBound, UnorderedBound, CenterSpread, MinPercentage
 import suprb.solution.mixing_model as mixing_model
@@ -92,11 +93,11 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferSmallerVolume(tolerance=0.0),  
+            subsumption=PreferLargerVolume(tolerance=0.0),  
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=32,
-        n_rules=4,
+        n_iter=64,
+        n_rules=8,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=random_state,
@@ -104,7 +105,10 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
 
 
 
+    start = time.perf_counter()
     model.fit(X, y)
+    elapsed = time.perf_counter() - start
+    print(f"Training took {elapsed:.2f} seconds ({elapsed / 60:.2f} minutes)")
     print([r.numerosity_ for r in model.pool_])
     print(model.rule_discovery_.subsumption)
     print(len(model.pool_))
