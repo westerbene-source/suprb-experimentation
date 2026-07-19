@@ -93,7 +93,7 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferSmallerVolume(tolerance=0.0),  
+            # subsumption=PreferSmallerVolume(tolerance=0.0),  
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=32,
