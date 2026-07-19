@@ -17,6 +17,7 @@ from experiments.mlflow import log_experiment
 from experiments.parameter_search import param_space
 from experiments.parameter_search.optuna import OptunaTuner
 from problems import scale_X_y
+import time
 
 from suprb import rule, SupRB
 from suprb.logging.combination import CombinedLogger
@@ -24,15 +25,14 @@ from suprb.logging.multi_objective import MOLogger
 from suprb.logging.stdout import StdoutLogger
 from suprb.optimizer.solution import nsga2, nsga3, spea2
 from suprb.optimizer.rule import es, origin, mutation, ns
-from suprb.optimizer.rule.ns.novelty_calculation import NoveltyCalculation  
-from suprb.optimizer.rule.ns.novelty_search_type import MinimalCriteria
+from suprb.rule.subsumption import PreferSmallerVolume, PreferLargerVolume
 from suprb.solution.initialization import RandomInit
 from suprb.rule.matching import OrderedBound, UnorderedBound, CenterSpread, MinPercentage
 import suprb.solution.mixing_model as mixing_model
 
 from problems import scale_X_y
 
-random_state = 42
+random_state = 43
 
 opt_dict = {
     "nsga2": nsga2.NonDominatedSortingGeneticAlgorithm2,
@@ -49,54 +49,7 @@ def load_dataset(name: str, **kwargs) -> tuple[np.ndarray, np.ndarray]:
         return getattr(datasets, method_name)(**kwargs)
 
 
-
-def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
-
-    print(f"Problem is {problem}, with job id {job_id} and optimizer {optimizer}")
-
-    X, y = load_dataset(name=problem, return_X_y=True)
-    X, y = scale_X_y(X, y)
-    X, y = shuffle(X, y, random_state=random_state)
-
-    model = SupRB(
-    rule_discovery=ns.NoveltySearch(
-                novelty_calculation=NoveltyCalculation(
-                    novelty_search_type=MinimalCriteria(min_examples_matched=15)
-                ),
-                init=rule.initialization.MeanInit(
-                    fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=random_state)
-                ),
-                mutation=mutation.HalfnormIncrease(),
-                origin_generation=origin.SquaredError(),
-            ),
-        solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=64,
-        n_rules=8,
-        verbose=10,
-        logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
-        random_state=random_state,
-    )
-    model.fit(X, y)
-    return model
-
-def get_final_pool(model: SupRB) -> list:
-
-    return model.pool_  
-
-def pred_diff_on_overlap(containing_rule, contained_rule) -> np.ndarray:
-    mask_i = containing_rule.match_set_
-    mask_j = contained_rule.match_set_
- 
-    # cumulative count of True's up to and including each position in mask_i;
-    # subtracting 1 gives the index into the compressed pred_i array
-    cum = np.cumsum(mask_i) - 1
-    idx_in_i = cum[mask_j]  # valid because mask_j ⊆ mask_i
- 
-    pred_i_on_overlap = containing_rule.pred_[idx_in_i]
-    return pred_i_on_overlap - contained_rule.pred_
-
 def get_effective_bounds(match) -> np.ndarray:
-
     if isinstance(match, OrderedBound):
         return match.bounds
 
@@ -121,6 +74,62 @@ def bounds_contains(outer_bounds: np.ndarray, inner_bounds: np.ndarray) -> bool:
         np.all(outer_bounds[:, 0] <= inner_bounds[:, 0])
         and np.all(outer_bounds[:, 1] >= inner_bounds[:, 1])
     )
+
+def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
+
+    print(f"Problem is {problem}, with job id {job_id} and optimizer {optimizer}")
+
+    X, y = load_dataset(name=problem, return_X_y=True)
+    X, y = scale_X_y(X, y)
+    X, y = shuffle(X, y, random_state=random_state)
+
+    model = SupRB(
+        rule_discovery=es.ES1xLambda(
+            operator="&",
+            n_iter=1000,
+            delay=30,
+            init=rule.initialization.MeanInit(
+                fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=random_state)
+            ),
+            mutation=mutation.HalfnormIncrease(),
+            origin_generation=origin.SquaredError(),
+            subsumption=PreferSmallerVolume(tolerance=0.0),  
+        ),
+        solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
+        n_iter=32,
+        n_rules=4,
+        verbose=10,
+        logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
+        random_state=random_state,
+    )
+
+
+
+    start = time.perf_counter()
+    model.fit(X, y)
+    elapsed = time.perf_counter() - start
+    print(f"Training took {elapsed:.2f} seconds ({elapsed / 60:.2f} minutes)")
+    print([r.numerosity_ for r in model.pool_])
+    print(model.rule_discovery_.subsumption)
+    print(len(model.pool_))
+    print(model.elitist_.genome.shape if hasattr(model.elitist_, "genome") else "check attribute name")
+    return model
+
+def get_final_pool(model: SupRB) -> list:
+
+    return model.pool_  
+
+def pred_diff_on_overlap(containing_rule, contained_rule) -> np.ndarray:
+    mask_i = containing_rule.match_set_
+    mask_j = contained_rule.match_set_
+ 
+    # cumulative count of True's up to and including each position in mask_i;
+    # subtracting 1 gives the index into the compressed pred_i array
+    cum = np.cumsum(mask_i) - 1
+    idx_in_i = cum[mask_j]  # valid because mask_j ⊆ mask_i
+ 
+    pred_i_on_overlap = containing_rule.pred_[idx_in_i]
+    return pred_i_on_overlap - contained_rule.pred_
 
 
 def analyze_pool(pool: list, tolerance: float = 0.0) -> pd.DataFrame:
@@ -203,9 +212,8 @@ def main():
     model = run_single_cycle("airfoil_self_noise", "NA", "spea2")
     pool = get_final_pool(model)
  
-    df = analyze_pool(pool, 0.05) #toleranz
-
-    n_rules_in_pool = max(df["i"].max(), df["j"].max()) + 1
+    df = analyze_pool(pool, 0.00)
+    n_rules_in_pool = len(pool)
     summarize(df, n_rules_in_pool=n_rules_in_pool)
  
     out_path = "output/subsumption_pairs_airfoil.csv"

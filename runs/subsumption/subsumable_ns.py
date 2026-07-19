@@ -25,14 +25,16 @@ from suprb.logging.multi_objective import MOLogger
 from suprb.logging.stdout import StdoutLogger
 from suprb.optimizer.solution import nsga2, nsga3, spea2
 from suprb.optimizer.rule import es, origin, mutation, ns
-from suprb.rule.subsumption import PreferSmallerVolume, PreferLargerVolume
+from suprb.optimizer.rule.ns.novelty_calculation import NoveltyCalculation  
+from suprb.optimizer.rule.ns.novelty_search_type import MinimalCriteria
 from suprb.solution.initialization import RandomInit
 from suprb.rule.matching import OrderedBound, UnorderedBound, CenterSpread, MinPercentage
+from suprb.rule.subsumption import PreferSmallerVolume, PreferLargerVolume
 import suprb.solution.mixing_model as mixing_model
 
 from problems import scale_X_y
 
-random_state = 43
+random_state = 42
 
 opt_dict = {
     "nsga2": nsga2.NonDominatedSortingGeneticAlgorithm2,
@@ -75,6 +77,8 @@ def bounds_contains(outer_bounds: np.ndarray, inner_bounds: np.ndarray) -> bool:
         and np.all(outer_bounds[:, 1] >= inner_bounds[:, 1])
     )
 
+
+
 def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
 
     print(f"Problem is {problem}, with job id {job_id} and optimizer {optimizer}")
@@ -84,17 +88,17 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
     X, y = shuffle(X, y, random_state=random_state)
 
     model = SupRB(
-        rule_discovery=es.ES1xLambda(
-            operator="&",
-            n_iter=1000,
-            delay=30,
-            init=rule.initialization.MeanInit(
-                fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=random_state)
+    rule_discovery=ns.NoveltySearch(
+                novelty_calculation=NoveltyCalculation(
+                    novelty_search_type=MinimalCriteria(min_examples_matched=15)
+                ),
+                init=rule.initialization.MeanInit(
+                    fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=random_state)
+                ),
+                mutation=mutation.HalfnormIncrease(),
+                origin_generation=origin.SquaredError(),
+                # subsumption=PreferSmallerVolume(tolerance=0.0),  
             ),
-            mutation=mutation.HalfnormIncrease(),
-            origin_generation=origin.SquaredError(),
-            subsumption=PreferLargerVolume(tolerance=0.0),  
-        ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=64,
         n_rules=8,
@@ -102,7 +106,6 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=random_state,
     )
-
 
 
     start = time.perf_counter()
