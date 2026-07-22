@@ -32,7 +32,7 @@ import suprb.solution.mixing_model as mixing_model
 
 from problems import scale_X_y
 
-random_state = 43
+random_state = 44
 
 opt_dict = {
     "nsga2": nsga2.NonDominatedSortingGeneticAlgorithm2,
@@ -93,14 +93,15 @@ def run_single_cycle(problem: str, job_id: str, optimizer: str) -> SupRB:
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            # subsumption=PreferSmallerVolume(tolerance=0.0),  
+            subsumption=PreferSmallerVolume(tolerance=0.0),  
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=32,
+        n_iter=200,
         n_rules=4,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=random_state,
+        early_stopping_patience = 20
     )
 
 

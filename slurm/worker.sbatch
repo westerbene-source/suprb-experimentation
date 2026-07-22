@@ -2,88 +2,55 @@
 ###############################################################################
 # worker.sbatch
 #
-# One worker task. Very lightweight — just runs the Python experiment and
-# writes its Optuna trial results to the shared PostgreSQL study.
+# ONE combined allocation holding ALL worker tasks for this study. Submitted
+# by the coordinator with --ntasks=<n-workers>, so Slurm treats it as a
+# single scheduling decision: the job only starts once the *entire*
+# allocation (all ntasks x cpus-per-task x mem-per-cpu) is free, and once it
+# starts, every task begins in the same instant via the single srun step
+# below.
+#
+# This replaces the old --array=0-N approach, where each array element was
+# scheduled independently and — on a busy cluster — trickled in one at a
+# time, giving early workers a large, unfair head start over later ones
+# (and sometimes leaving later ones with no time budget left at all).
 #
 # NOT submitted directly. The coordinator (start_study.sbatch) submits this
-# as an array job and passes all required variables via --export.
+# with --ntasks=$N_WORKERS and --export=... set at submission time.
 #
-# Environment variables expected from coordinator:
+# Environment variables expected from coordinator (--export):
 #   OPTIMIZER        e.g. "nsga2"
 #   DATASET          e.g. "airfoil_self_noise"
 #   PG_SOCKET_DIR    path to the shared PostgreSQL UNIX socket directory
 #   STUDY_NAME       the Optuna study name to attach to
 #   TIMEOUT_HOURS    per-worker time budget (hours, float ok)
 ###############################################################################
-#SBATCH --job-name=suprb_worker
+#SBATCH --job-name=suprb_workers
 #SBATCH --partition=cpu
 #SBATCH --nodelist=oc-compute04
+#SBATCH --ntasks=16            # overridden by coordinator's --ntasks=$N_WORKERS
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=8G
+#SBATCH --mem-per-cpu=4G       # 2 cpus x 4G = 8G/task, same per-worker budget as before
 #SBATCH --time=80:00:00
-#SBATCH --output=output/worker_%A_%a.out
-#SBATCH --error=output/worker_%A_%a.err
-# NOTE: --array and --export are set by the coordinator at submission time.
+#SBATCH --output=output/workers_%j.out
+#SBATCH --error=output/workers_%j.err
+# NOTE: --ntasks and --export are set by the coordinator at submission time.
 
 source /projects/shared/lib/slurm-utils.sh
 
 PROJECT_DIR="/home/$USER/suprb-experimentation"
 export PYTHONPATH="${PYTHONPATH}:${PROJECT_DIR}"
-EXPERIMENT="runs/moo_sc/baseline_tuning/simple_moo_tuning_database.py"
-
-# Save results to per-worker scratch, then copy to shared results on exit
-trap '
-    echo "[$(date)] Worker ${SLURM_ARRAY_TASK_ID} trap: saving results..."
-    save_results "$SCRATCH" ~"/results/sweep-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}"
-' EXIT ERR SIGTERM
-
-# ---------------------------------------------------------------------------
-# Stagger start slightly to avoid thundering-herd on the DB socket
-# ---------------------------------------------------------------------------
-sleep $(( SLURM_ARRAY_TASK_ID % 20 ))
 
 cd "${PROJECT_DIR}"
 
-# ---------------------------------------------------------------------------
-# Wait until devenv is ready (Task 0 of the coordinator already built it)
-# ---------------------------------------------------------------------------
-echo "[$(date)] Worker ${SLURM_ARRAY_TASK_ID}: checking devenv..."
-nix develop ./slurm --no-pure-eval --command python --version
+echo "[$(date)] Job ${SLURM_JOB_ID}: launching ${SLURM_NTASKS} workers as one synchronized step..."
 
-# ---------------------------------------------------------------------------
-# Verify the PostgreSQL socket is reachable before starting expensive work
-# ---------------------------------------------------------------------------
-STORAGE_URL="postgresql+psycopg2:///optuna_db?host=${PG_SOCKET_DIR}"
+# A single srun step launches SLURM_NTASKS copies of worker_task.sh at once.
+# Because they're all part of the same allocation/step, they start together
+# — that's what actually gives us the simultaneous start, not just the
+# combined sbatch request above.
+srun --ntasks="${SLURM_NTASKS}" --cpus-per-task=2 \
+    --output="${PROJECT_DIR}/output/worker_%j_%t.out" \
+    --error="${PROJECT_DIR}/output/worker_%j_%t.err" \
+    bash "${PROJECT_DIR}/slurm/worker_task.sh"
 
-echo "[$(date)] Worker ${SLURM_ARRAY_TASK_ID}: verifying DB connection..."
-nix develop ./slurm --no-pure-eval --command python - <<PYEOF
-import psycopg2, sys
-try:
-    conn = psycopg2.connect(dbname="optuna_db", host="${PG_SOCKET_DIR}")
-    conn.close()
-    print("DB connection OK")
-except Exception as e:
-    print(f"DB connection FAILED: {e}", file=sys.stderr)
-    sys.exit(1)
-PYEOF
-
-# ---------------------------------------------------------------------------
-# Run the experiment — one trial-contributing worker
-# ---------------------------------------------------------------------------
-echo "[$(date)] Worker ${SLURM_ARRAY_TASK_ID}: starting experiment (optimizer=${OPTIMIZER}, dataset=${DATASET})"
-
-TIMEOUT_SECONDS=$(python3 -c "print(int(float('${TIMEOUT_HOURS}') * 3600))")
-
-nix develop ./slurm --no-pure-eval --command \
-    env \
-        PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH}" \
-        OPTUNA_STORAGE="${STORAGE_URL}" \
-        OPTUNA_STUDY_NAME="${STUDY_NAME}" \
-        WORKER_TIMEOUT="${TIMEOUT_SECONDS}" \
-    python "${PROJECT_DIR}/${EXPERIMENT}" \
-        -p "${DATASET}" \
-        -j "${SLURM_ARRAY_JOB_ID}" \
-        -o "${OPTIMIZER}" \
-        --worker-id "${SLURM_ARRAY_TASK_ID}"
-
-echo "[$(date)] Worker ${SLURM_ARRAY_TASK_ID}: finished."
+echo "[$(date)] Job ${SLURM_JOB_ID}: all workers finished."
