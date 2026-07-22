@@ -117,7 +117,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
     trials_per_worker = 40
 
  
-    timeout_seconds = int(os.environ.get("WORKER_TIMEOUT", 60 * 60 * 24 * 3))
+    timeout_seconds = int(os.environ.get("WORKER_TIMEOUT", 60 * 60 * 24))
 
     print(f"Storage : {storage_url}")
     print(f"Study   : {study_name}")

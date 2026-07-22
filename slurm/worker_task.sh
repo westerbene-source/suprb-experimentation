@@ -13,7 +13,7 @@ set -e
 
 WORKER_ID="${SLURM_PROCID}"
 PROJECT_DIR="/home/$USER/suprb-experimentation"
-EXPERIMENT="runs/moo_sc/baseline_tuning/simple_moo_tuning_database.py"
+EXPERIMENT="runs/subsumption/subsumable_db.py"
 
 source /projects/shared/lib/slurm-utils.sh
 
