@@ -29,9 +29,9 @@
 # ---------------------------------------------------------------------------
 # Parse arguments (override defaults via command line)
 # ---------------------------------------------------------------------------
-OPTIMIZER="nsga2"
+OPTIMIZER="spea2"
 DATASET="airfoil_self_noise"
-N_WORKERS=16          # how many parallel worker tasks to launch (all at once)
+N_WORKERS=25          # how many parallel worker tasks to launch (all at once)
 TIMEOUT_HOURS=72      # total wall-clock budget for the study (hours)
 
 while [[ $# -gt 0 ]]; do
