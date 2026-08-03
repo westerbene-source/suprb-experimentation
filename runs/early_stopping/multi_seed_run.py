@@ -89,12 +89,12 @@ def run_single_cycle(problem: str, seed: int, optimizer: str) -> tuple[SupRB, np
             subsumption=PreferSmallerVolume(tolerance=0.05),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=64,
+        n_iter=200,
         n_rules=8,
         verbose=0,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=seed,
-        # early_stopping_patience=20,
+        early_stopping_patience=5,
     )
  
     model.fit(X, y)
@@ -168,6 +168,6 @@ if __name__ == "__main__":
         optimizer="spea2",
         n_runs=100,
         base_seed=0,
-        out_path="output/multi_seed_results.csv",
+        out_path="output/multi_seed_resultsearly5niter.csv",
     )
  

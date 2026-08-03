@@ -32,7 +32,7 @@
 OPTIMIZER="spea2"
 DATASET="airfoil_self_noise"
 N_WORKERS=25          # how many parallel worker tasks to launch (all at once)
-TIMEOUT_HOURS=72      # total wall-clock budget for the study (hours)
+TIMEOUT_HOURS=24      # per-worker tuning budget passed to OptunaTuner's `timeout=` (hours)
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -162,7 +162,7 @@ echo "[$(date)] Submitting ${N_WORKERS} workers as one synchronized allocation..
 WORKER_JOB_ID=$(sbatch \
     --parsable \
     --ntasks="${N_WORKERS}" \
-    --export=ALL,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_SOCKET_DIR="${PG_SOCKET_DIR}",STUDY_NAME="${STUDY_NAME}",TIMEOUT_HOURS="${TIMEOUT_HOURS}" \
+    --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_SOCKET_DIR="${PG_SOCKET_DIR}",STUDY_NAME="${STUDY_NAME}",TIMEOUT_HOURS="${TIMEOUT_HOURS}" \
     slurm/worker.sbatch)
 
 echo "[$(date)] Workers submitted as job ${WORKER_JOB_ID}"
