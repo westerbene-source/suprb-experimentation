@@ -139,7 +139,7 @@ def run_multi_seed(
             training_score = model.score(X, y)
             hypervolume = get_hypervolume(model)
             subsumed_rules = n_iterations * 8 - final_pool_size
-            subsumed_procent = final_pool_size / n_iterations * 8
+            subsumed_procent = (n_iterations * 8 - final_pool_size) / (n_iterations * 8)
  
             row = {
                 "seed": seed,
