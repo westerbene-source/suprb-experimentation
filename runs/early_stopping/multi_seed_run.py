@@ -110,6 +110,8 @@ def run_multi_seed(
         "training_score",
         "hypervolume",
         "elapsed_seconds",
+        "subsumed_ruels",
+        "subsumed_procent",
     ]
  
     file_exists = os.path.isfile(out_path)
