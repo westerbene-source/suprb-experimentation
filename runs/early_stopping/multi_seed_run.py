@@ -49,9 +49,7 @@ def load_dataset(name: str, **kwargs) -> tuple[np.ndarray, np.ndarray]:
  
 def get_n_iterations(model: SupRB):
     """
-    Best-effort extraction of how many outer SupRB iterations actually ran
-    (relevant when early_stopping_patience triggers before n_iter).
-    Tries a few likely attribute names since this depends on your suprb version.
+    
     """
     for attr in ("n_iter_", "step_", "iter_", "n_iterations_", "generation_"):
         if hasattr(model, attr):
@@ -60,11 +58,6 @@ def get_n_iterations(model: SupRB):
  
  
 def get_hypervolume(model: SupRB):
-    """
-    Matches the pattern used internally in suprb.py:
-        if hasattr(self.solution_composition_, "hypervolume"):
-            return self.solution_composition_.hypervolume()
-    """
     solution_composition = getattr(model, "solution_composition_", None)
     if solution_composition is not None and hasattr(solution_composition, "hypervolume"):
         return solution_composition.hypervolume()
@@ -91,7 +84,7 @@ def run_single_cycle(problem: str, seed: int, optimizer: str) -> tuple[SupRB, np
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=200,
         n_rules=8,
-        verbose=0,
+        verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=seed,
         early_stopping_patience=5,
@@ -133,18 +126,18 @@ def run_multi_seed(
             model, X, y = run_single_cycle(problem, seed, optimizer)
             elapsed = time.perf_counter() - start
  
-            # On the very first run, print all attributes so you can double check
-            # the n_iterations / elitist_fitness extraction picked the right names.
             if i == 0:
                 print("[diagnostic] model attributes:", [a for a in dir(model) if a.endswith("_") and not a.startswith("_")])
                 sc = getattr(model, "solution_composition_", None)
                 if sc is not None:
                     print("[diagnostic] solution_composition_ has hypervolume:", hasattr(sc, "hypervolume"))
  
-            n_iterations = get_n_iterations(model)
+            n_iterations = get_n_iterations(model) + 1
             final_pool_size = len(model.pool_)
             training_score = model.score(X, y)
             hypervolume = get_hypervolume(model)
+            subsumed_rules = n_iterations * 8 - final_pool_size
+            subsumed_procent = final_pool_size / n_iterations * 8
  
             row = {
                 "seed": seed,
@@ -153,6 +146,8 @@ def run_multi_seed(
                 "training_score": training_score,
                 "hypervolume": hypervolume,
                 "elapsed_seconds": round(elapsed, 2),
+                "subsumed_ruels": subsumed_rules,
+                "subsumed_procent": subsumed_procent,
             }
             writer.writerow(row)
             f.flush()
@@ -168,6 +163,6 @@ if __name__ == "__main__":
         optimizer="spea2",
         n_runs=100,
         base_seed=0,
-        out_path="output/multi_seed_resultsearly5niter.csv",
+        out_path="output/multi_seed_results_early5_s005_new.csv",
     )
  
