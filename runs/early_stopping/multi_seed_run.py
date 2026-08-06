@@ -79,15 +79,15 @@ def run_single_cycle(problem: str, seed: int, optimizer: str) -> tuple[SupRB, np
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferSmallerVolume(tolerance=0.05),
+            subsumption=PreferSmallerVolume(tolerance=0.00),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=200,
+        n_iter=32,
         n_rules=8,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=seed,
-        early_stopping_patience=5,
+        # early_stopping_patience=10,
     )
  
     model.fit(X, y)
@@ -165,6 +165,6 @@ if __name__ == "__main__":
         optimizer="spea2",
         n_runs=100,
         base_seed=0,
-        out_path="output/multi_seed_results_early5_s005_new.csv",
+        out_path="output/multi_seed_results_noearly_s000_new_bettersubsumption.csv",
     )
  
