@@ -3,12 +3,16 @@ import sys
 
 import numpy as np
 import click
+import mlflow
 from optuna import Trial
 
 from sklearn.linear_model import Ridge
 from sklearn.utils import Bunch, shuffle
+from sklearn.model_selection import ShuffleSplit
 
 from experiments import Experiment
+from experiments.evaluation import CrossValidate, MOOCrossValidate
+from experiments.mlflow import log_experiment
 from experiments.parameter_search import param_space
 from experiments.parameter_search.optuna import OptunaTuner
 from problems import scale_X_y
@@ -19,8 +23,9 @@ from suprb.logging.multi_objective import MOLogger
 from suprb.logging.stdout import StdoutLogger
 from suprb.optimizer.solution import nsga2, nsga3, spea2
 from suprb.optimizer.rule import es, origin, mutation
-from suprb.rule.subsumption import PreferLargerVolume
-
+from suprb.rule.subsumption import PreferSmallerVolume, PreferLargerVolume
+from suprb.solution.initialization import RandomInit
+import suprb.solution.mixing_model as mixing_model
 
 random_state = 42
 
