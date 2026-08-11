@@ -1,4 +1,4 @@
--e git+https://github.com/westerbene-source/suprb.git@bachelor_niter#egg=suprb
+-e git+https://github.com/westerbene-source/suprb.git@bachelor_niter
 -e git+https://github.com/dpaetzel/cmpbayes@main#egg=cmpbayes
 
 
