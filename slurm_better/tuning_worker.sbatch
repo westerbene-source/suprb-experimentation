@@ -7,7 +7,7 @@
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=2
 #SBATCH --mem-per-cpu=2G
-#SBATCH --time=30:00:00
+#SBATCH --time=26:00:00
 #SBATCH --output=output/tune_%j.out
 #SBATCH --error=output/tune_%j.err
 
@@ -21,7 +21,7 @@ trap 'save_results "$SCRATCH" ~"/results/tuning-${SLURM_JOB_ID}/task-${WORKER_ID
 
 STORAGE_URL="postgresql+psycopg2:///optuna_db?host=${PG_SOCKET_DIR}"
 
-nix develop ./slurm --no-pure-eval --command python - <<PYEOF
+nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
 import psycopg2, sys
 try:
     psycopg2.connect(dbname="optuna_db", host="${PG_SOCKET_DIR}").close()
@@ -32,7 +32,7 @@ PYEOF
 
 TIMEOUT_SECONDS=$(python3 -c "print(int(float('${TIMEOUT_HOURS}') * 3600))")
 
-nix develop ./slurm --no-pure-eval --command \
+nix develop ./slurm_better --no-pure-eval --command \
     env \
         PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH}" \
         OPTUNA_STORAGE="${STORAGE_URL}" \

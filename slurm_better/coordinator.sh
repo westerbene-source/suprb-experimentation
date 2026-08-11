@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run inside zellij on oc-head:
 #   zellij
-#   bash slurm/coordinator.sh --optimizer spea2 --dataset airfoil_self_noise --n-workers 25
+#   bash slurm_better/coordinator.sh --optimizer spea2 --dataset airfoil_self_noise --n-workers 25
 set -e
 
 OPTIMIZER="spea2"
@@ -42,7 +42,7 @@ mkdir -p "$PG_SOCKET_DIR"
 echo "[$(date)] Run ${RUN_ID}: submitting PostgreSQL job on ${NODE}..."
 PG_JOB_ID=$(sbatch --parsable --nodelist="${NODE}" \
     --export=NONE,STUDY_NAME="${STUDY_NAME}",PG_BASE="${PG_BASE}" \
-    slurm/postgres.sbatch)
+    slurm_better/postgres.sbatch)
 echo "[$(date)] Postgres job ${PG_JOB_ID} submitted, waiting for it to become ready..."
 
 until [ -f "$READY_FLAG" ]; do
@@ -59,7 +59,7 @@ TUNE_JOB_IDS=()
 for i in $(seq 0 $((N_WORKERS - 1))); do
     JOB_ID=$(sbatch --parsable --nodelist="${NODE}" \
         --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_SOCKET_DIR="${PG_SOCKET_DIR}",STUDY_NAME="${STUDY_NAME}",TIMEOUT_HOURS="${TUNING_TIMEOUT_HOURS}",WORKER_ID="${i}" \
-        slurm/tuning_worker.sbatch)
+        slurm_better/tuning_worker.sbatch)
     TUNE_JOB_IDS+=("$JOB_ID")
 done
 echo "[$(date)] Tuning jobs: ${TUNE_JOB_IDS[*]}"
@@ -74,7 +74,7 @@ EVAL_JOB_IDS=()
 for i in $(seq 0 $((N_WORKERS - 1))); do
     JOB_ID=$(sbatch --parsable --nodelist="${NODE}" \
         --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_SOCKET_DIR="${PG_SOCKET_DIR}",STUDY_NAME="${STUDY_NAME}",WORKER_ID="${i}" \
-        slurm/eval_worker.sbatch)
+        slurm_better/eval_worker.sbatch)
     EVAL_JOB_IDS+=("$JOB_ID")
 done
 echo "[$(date)] Evaluation jobs: ${EVAL_JOB_IDS[*]}"

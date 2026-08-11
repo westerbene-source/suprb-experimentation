@@ -21,7 +21,7 @@ trap 'save_results "$SCRATCH" ~"/results/eval-${SLURM_JOB_ID}/task-${WORKER_ID}"
 
 STORAGE_URL="postgresql+psycopg2:///optuna_db?host=${PG_SOCKET_DIR}"
 
-nix develop ./slurm --no-pure-eval --command python - <<PYEOF
+nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
 import psycopg2, sys
 try:
     psycopg2.connect(dbname="optuna_db", host="${PG_SOCKET_DIR}").close()
@@ -30,7 +30,7 @@ except Exception as e:
     sys.exit(1)
 PYEOF
 
-nix develop ./slurm --no-pure-eval --command \
+nix develop ./slurm_better --no-pure-eval --command \
     env \
         PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH}" \
         OPTUNA_STORAGE="${STORAGE_URL}" \

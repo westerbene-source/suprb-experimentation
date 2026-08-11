@@ -6,7 +6,7 @@
 #SBATCH --job-name=study_postgres
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=8G
+#SBATCH --mem=3G
 #SBATCH --time=120:00:00
 #SBATCH --output=output/postgres_%j.out
 #SBATCH --error=output/postgres_%j.err
@@ -31,7 +31,7 @@ STORAGE_URL="postgresql+psycopg2:///optuna_db?host=${PG_SOCKET_DIR}"
 
 cleanup() {
     if [ -f "$READY_FLAG" ]; then
-        nix develop ./slurm --no-pure-eval --command python - <<PYEOF
+        nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
 import optuna
 try:
     optuna.copy_study(from_study_name="${STUDY_NAME}", from_storage="${STORAGE_URL}", to_storage="sqlite:///${SQLITE_PATH}")
@@ -39,18 +39,18 @@ except Exception as e:
     print(f"SQLite export failed: {e}")
 PYEOF
     fi
-    nix develop ./slurm --no-pure-eval --command pg_ctl -D "$PG_DATA" stop -m fast 2>/dev/null || true
+    nix develop ./slurm_better --no-pure-eval --command pg_ctl -D "$PG_DATA" stop -m fast 2>/dev/null || true
     rm -f "$READY_FLAG" "$STOP_FLAG"
 }
 trap cleanup EXIT ERR SIGTERM
 
-nix develop ./slurm --no-pure-eval --command initdb -D "$PG_DATA" --no-locale --auth=trust
-nix develop ./slurm --no-pure-eval --command \
+nix develop ./slurm_better --no-pure-eval --command initdb -D "$PG_DATA" --no-locale --auth=trust
+nix develop ./slurm_better --no-pure-eval --command \
     pg_ctl -D "$PG_DATA" -o "-k ${PG_SOCKET_DIR} -h '' -N 200" -l "${PG_BASE}/postgres.log" start
 sleep 4
-nix develop ./slurm --no-pure-eval --command createdb -h "$PG_SOCKET_DIR" optuna_db
+nix develop ./slurm_better --no-pure-eval --command createdb -h "$PG_SOCKET_DIR" optuna_db
 
-nix develop ./slurm --no-pure-eval --command python - <<PYEOF
+nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
 import optuna
 optuna.create_study(study_name="${STUDY_NAME}", storage="${STORAGE_URL}", load_if_exists=True)
 PYEOF
