@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Submitted by coordinator.sh with --nodelist=<node> and
-# --export=NONE,RUN_ID=...,STUDY_NAME=...,PG_BASE=... Not meant to be
-# submitted directly. Stays alive until coordinator.sh touches STOP_FLAG,
-# then exports the study to SQLite and shuts down.
 #SBATCH --job-name=study_postgres
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=2
@@ -20,8 +16,10 @@ PG_DATA="${PG_BASE}/data"
 PG_SOCKET_DIR="${PG_BASE}/socket"
 READY_FLAG="${PG_BASE}/.pg_ready"
 STOP_FLAG="${PG_BASE}/.pg_stop"
+
+# Clear stale state flags before starting
+rm -f "$STOP_FLAG" "$READY_FLAG"
 mkdir -p "$PG_DATA" "$PG_SOCKET_DIR"
-rm -f "$STOP_FLAG"
 
 SQLITE_DIR="${PROJECT_DIR}/studies"
 SQLITE_PATH="${SQLITE_DIR}/${STUDY_NAME}.db"
@@ -44,20 +42,33 @@ PYEOF
 }
 trap cleanup EXIT ERR SIGTERM
 
-nix develop ./slurm_better --no-pure-eval --command initdb -D "$PG_DATA" --no-locale --auth=trust
+# Initialize DB if it doesn't exist
+if [ ! -d "$PG_DATA/PG_VERSION" ]; then
+    nix develop ./slurm_better --no-pure-eval --command initdb -D "$PG_DATA" --no-locale --auth=trust
+fi
+
+# Start PostgreSQL
 nix develop ./slurm_better --no-pure-eval --command \
     pg_ctl -D "$PG_DATA" -o "-k ${PG_SOCKET_DIR} -h '' -N 200" -l "${PG_BASE}/postgres.log" start
-sleep 4
-nix develop ./slurm_better --no-pure-eval --command createdb -h "$PG_SOCKET_DIR" optuna_db
 
+
+echo "Waiting for PostgreSQL socket to respond..."
+until nix develop ./slurm_better --no-pure-eval --command pg_isready -h "$PG_SOCKET_DIR"; do
+    sleep 1
+done
+
+# Create DB if it doesn't exist
+nix develop ./slurm_better --no-pure-eval --command createdb -h "$PG_SOCKET_DIR" optuna_db 2>/dev/null || true
+
+# Initialize Optuna Study Schema
 nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
 import optuna
 optuna.create_study(study_name="${STUDY_NAME}", storage="${STORAGE_URL}", load_if_exists=True)
 PYEOF
 
+# Signal to coordinator.sh that workers can now connect
 touch "$READY_FLAG"
 
 while [ ! -f "$STOP_FLAG" ]; do
-    sleep 30
+    sleep 10
 done
-# trap fires on exit -> export + shutdown

@@ -41,7 +41,7 @@ mkdir -p "$PG_SOCKET_DIR"
 # scheduled time sitting idle inside a job waiting on the DB.
 echo "[$(date)] Run ${RUN_ID}: submitting PostgreSQL job on ${NODE}..."
 PG_JOB_ID=$(sbatch --parsable --nodelist="${NODE}" \
-    --export=NONE,STUDY_NAME="${STUDY_NAME}",PG_BASE="${PG_BASE}" \
+    --export=NONE,RUN_ID="${RUN_ID}",STUDY_NAME="${STUDY_NAME}",PG_BASE="${PG_BASE}" \
     slurm_better/postgres.sbatch)
 echo "[$(date)] Postgres job ${PG_JOB_ID} submitted, waiting for it to become ready..."
 
