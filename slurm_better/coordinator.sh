@@ -26,7 +26,7 @@ source /projects/shared/lib/slurm-utils.sh
 PROJECT_DIR="/home/$USER/suprb-experimentation"
 cd "${PROJECT_DIR}"
 
-RUN_ID="${OPTIMIZER}_${DATASET}_$(date +%Y%m%d_%H%M%S)"
+RUN_ID="${OPTIMIZER}_${DATASET}"
 STUDY_NAME="${OPTIMIZER}_tuning_${DATASET}_${RUN_ID}"
 
 PG_BASE="${PROJECT_DIR}/.postgres_shared/${RUN_ID}"
