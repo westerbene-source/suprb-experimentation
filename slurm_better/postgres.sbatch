@@ -43,7 +43,7 @@ PYEOF
 trap cleanup EXIT ERR SIGTERM
 
 # Initialize DB if it doesn't exist
-if [ ! -d "$PG_DATA/PG_VERSION" ]; then
+if [ ! -f "$PG_DATA/PG_VERSION" ]; then
     nix develop ./slurm_better --no-pure-eval --command initdb -D "$PG_DATA" --no-locale --auth=trust
 fi
 
