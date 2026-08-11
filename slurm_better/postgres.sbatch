@@ -55,6 +55,7 @@ nix develop ./slurm_better --no-pure-eval --command \
 echo "Waiting for PostgreSQL socket to respond..."
 until nix develop ./slurm_better --no-pure-eval --command pg_isready -h "$PG_SOCKET_DIR"; do
     sleep 1
+    echo "[$(date)] checking for socket response"
 done
 
 # Create DB if it doesn't exist
