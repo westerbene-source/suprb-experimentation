@@ -1,3 +1,5 @@
+-e git+https://github.com/heidmic/suprb@master#egg=suprb
+-e git+https://github.com/dpaetzel/cmpbayes@main#egg=cmpbayes
 
 
 arviz==0.21.0
