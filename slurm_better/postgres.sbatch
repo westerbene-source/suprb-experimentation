@@ -29,6 +29,7 @@ STORAGE_URL="postgresql+psycopg2:///optuna_db?host=${PG_SOCKET_DIR}"
 
 cleanup() {
     if [ -f "$READY_FLAG" ]; then
+        rm -f "$SQLITE_PATH"
         nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
 import optuna
 try:
@@ -70,6 +71,17 @@ PYEOF
 # Signal to coordinator.sh that workers can now connect
 touch "$READY_FLAG"
 
+last_heartbeat=0
 while [ ! -f "$STOP_FLAG" ]; do
+    now=$(date +%s)
+    if (( now - last_heartbeat >= 240 )); then
+        nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF 2>/dev/null || echo "[$(date)] heartbeat query failed"
+import psycopg2
+conn = psycopg2.connect(dbname="optuna_db", host="${PG_SOCKET_DIR}")
+conn.cursor().execute("SELECT 1;")
+conn.close()
+PYEOF
+        last_heartbeat=$now
+    fi
     sleep 10
 done

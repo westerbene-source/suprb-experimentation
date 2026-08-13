@@ -10,6 +10,7 @@
 #SBATCH --time=01:00:00
 #SBATCH --output=output/eval_%j.out
 #SBATCH --error=output/eval_%j.err
+set -e
 
 source /projects/shared/lib/slurm-utils.sh
 

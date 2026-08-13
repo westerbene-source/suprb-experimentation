@@ -10,6 +10,7 @@
 #SBATCH --time=26:00:00
 #SBATCH --output=output/tune_%j.out
 #SBATCH --error=output/tune_%j.err
+set -e
 
 source /projects/shared/lib/slurm-utils.sh
 
