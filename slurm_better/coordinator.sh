@@ -26,6 +26,9 @@ source /projects/shared/lib/slurm-utils.sh
 PROJECT_DIR="/home/$USER/suprb-experimentation"
 cd "${PROJECT_DIR}"
 
+echo "[$(date)] Warming Nix cache..."
+nix develop ./slurm_better --no-pure-eval --command true
+
 RUN_ID="${OPTIMIZER}_${DATASET}"
 STUDY_NAME="${OPTIMIZER}_tuning_${DATASET}_${RUN_ID}"
 
