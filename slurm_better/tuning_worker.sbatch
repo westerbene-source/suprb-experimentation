@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Submitted individually by coordinator.sh, once per worker, only after the
-# DB is confirmed ready. OPTIMIZER/DATASET/PG_SOCKET_DIR/STUDY_NAME/
-# TIMEOUT_HOURS/WORKER_ID passed via --export. Not meant to be submitted
-# directly.
 #SBATCH --job-name=suprb_tune
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=2
@@ -20,12 +16,13 @@ cd "${PROJECT_DIR}"
 
 trap 'save_results "$SCRATCH" ~"/results/tuning-${SLURM_JOB_ID}/task-${WORKER_ID}"' EXIT ERR SIGTERM
 
-STORAGE_URL="postgresql+psycopg2:///optuna_db?host=${PG_SOCKET_DIR}"
+STORAGE_URL="postgresql+psycopg2://localhost:${PG_PORT}/optuna_db"
 
+# Test DB connectivity
 nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
 import psycopg2, sys
 try:
-    psycopg2.connect(dbname="optuna_db", host="${PG_SOCKET_DIR}").close()
+    psycopg2.connect(dbname="optuna_db", host="localhost", port="${PG_PORT}").close()
 except Exception as e:
     print(f"DB connection FAILED: {e}", file=sys.stderr)
     sys.exit(1)

@@ -32,19 +32,34 @@ nix develop ./slurm_better --no-pure-eval --command true
 RUN_ID="${OPTIMIZER}_${DATASET}"
 STUDY_NAME="${OPTIMIZER}_tuning_${DATASET}_${RUN_ID}"
 
+# Choose a free TCP port for this run (range 15000-20000)
+find_free_port() {
+    local base=15000
+    local max=20000
+    local hash=$(echo -n "$1" | md5sum | cut -c1-4)
+    local port=$((0x$hash % 5000 + $base))
+    while ss -tln | grep -q ":${port} "; do
+        port=$((port + 1))
+        if [ $port -gt $max ]; then
+            port=$base
+        fi
+    done
+    echo "$port"
+}
+PG_PORT=$(find_free_port "$RUN_ID")
+echo "[$(date)] Using PostgreSQL port: ${PG_PORT}"
+
 PG_BASE="${PROJECT_DIR}/.postgres_shared/${RUN_ID}"
-PG_SOCKET_DIR="${PG_BASE}/socket"
+PG_DATA="${PG_BASE}/data"
+PG_SOCKET_DIR="${PG_BASE}/socket"   # not used for connections, but may be left for internal use
 READY_FLAG="${PG_BASE}/.pg_ready"
 STOP_FLAG="${PG_BASE}/.pg_stop"
-mkdir -p "$PG_SOCKET_DIR"
+mkdir -p "$PG_DATA" "$PG_SOCKET_DIR"
 
-# Submit the DB job and wait for it to actually be ready BEFORE submitting
-# any worker. This is the whole point: workers only ever enter the queue
-# once they can use their allocation immediately, so none of them burn
-# scheduled time sitting idle inside a job waiting on the DB.
+# Submit the DB job and wait for it to become ready
 echo "[$(date)] Run ${RUN_ID}: submitting PostgreSQL job on ${NODE}..."
 PG_JOB_ID=$(sbatch --parsable --nodelist="${NODE}" \
-    --export=NONE,RUN_ID="${RUN_ID}",STUDY_NAME="${STUDY_NAME}",PG_BASE="${PG_BASE}" \
+    --export=NONE,RUN_ID="${RUN_ID}",STUDY_NAME="${STUDY_NAME}",PG_BASE="${PG_BASE}",PG_PORT="${PG_PORT}" \
     slurm_better/postgres.sbatch)
 echo "[$(date)] Postgres job ${PG_JOB_ID} submitted, waiting for it to become ready..."
 
@@ -55,13 +70,13 @@ until [ -f "$READY_FLAG" ]; do
     fi
     sleep 10
 done
-echo "[$(date)] PostgreSQL ready."
+echo "[$(date)] PostgreSQL ready on port ${PG_PORT}."
 
 echo "[$(date)] Submitting ${N_WORKERS} tuning workers on ${NODE}..."
 TUNE_JOB_IDS=()
 for i in $(seq 0 $((N_WORKERS - 1))); do
     JOB_ID=$(sbatch --parsable --nodelist="${NODE}" \
-        --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_SOCKET_DIR="${PG_SOCKET_DIR}",STUDY_NAME="${STUDY_NAME}",TIMEOUT_HOURS="${TUNING_TIMEOUT_HOURS}",WORKER_ID="${i}" \
+        --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_PORT="${PG_PORT}",STUDY_NAME="${STUDY_NAME}",TIMEOUT_HOURS="${TUNING_TIMEOUT_HOURS}",WORKER_ID="${i}" \
         slurm_better/tuning_worker.sbatch)
     TUNE_JOB_IDS+=("$JOB_ID")
 done
@@ -76,7 +91,7 @@ echo "[$(date)] Submitting ${N_WORKERS} evaluation workers on ${NODE}..."
 EVAL_JOB_IDS=()
 for i in $(seq 0 $((N_WORKERS - 1))); do
     JOB_ID=$(sbatch --parsable --nodelist="${NODE}" \
-        --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_SOCKET_DIR="${PG_SOCKET_DIR}",STUDY_NAME="${STUDY_NAME}",WORKER_ID="${i}" \
+        --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_PORT="${PG_PORT}",STUDY_NAME="${STUDY_NAME}",WORKER_ID="${i}" \
         slurm_better/eval_worker.sbatch)
     EVAL_JOB_IDS+=("$JOB_ID")
 done
