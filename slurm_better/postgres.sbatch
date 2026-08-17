@@ -50,7 +50,7 @@ fi
 
 # Start PostgreSQL
 nix develop ./slurm_better --no-pure-eval --command \
-    pg_ctl -D "$PG_DATA" -o "-k ${PG_SOCKET_DIR} -h '' -N 200" -l "${PG_BASE}/postgres.log" start
+    pg_ctl -D "$PG_DATA" -o "-k ${PG_SOCKET_DIR} -h '' -N 200 -c dynamic_shared_memory_type=sysv" -l "${PG_BASE}/postgres.log" start
 
 
 echo "Waiting for PostgreSQL socket to respond..."

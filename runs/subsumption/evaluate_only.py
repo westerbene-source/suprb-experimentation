@@ -6,6 +6,7 @@ import pandas as pd
 
 import click
 import mlflow
+import optuna
 from optuna import Trial
 
 from sklearn.linear_model import Ridge
