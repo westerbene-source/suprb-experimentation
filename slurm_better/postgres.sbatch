@@ -12,6 +12,10 @@ source /projects/shared/lib/slurm-utils.sh
 PROJECT_DIR="/home/$USER/suprb-experimentation"
 cd "${PROJECT_DIR}"
 
+SQLITE_DIR="${PROJECT_DIR}/studies"
+SQLITE_PATH="${SQLITE_DIR}/${STUDY_NAME}.db"
+mkdir -p "$SQLITE_DIR"
+
 PG_DATA="${PG_BASE}/data"
 PG_SOCKET_DIR="${PG_BASE}/socket"       # keep for potential local connections, but not used
 READY_FLAG="${PG_BASE}/.pg_ready"
