@@ -17,6 +17,9 @@ trap 'save_results "$SCRATCH" ~"/results/tuning-${SLURM_JOB_ID}/task-${WORKER_ID
 
 STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
 
+export DEVENV_DOTFILE="${SCRATCH:-/tmp/$USER}/devenv-dotfile-${SLURM_JOB_ID}"
+mkdir -p "$DEVENV_DOTFILE"
+
 # Test DB connectivity
 nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
 import psycopg2, sys
