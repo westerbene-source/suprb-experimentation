@@ -47,14 +47,14 @@ find_free_port() {
     echo "$port"
 }
 PG_PORT=$(find_free_port "$RUN_ID")
+PG_HOST="localhost"   # DB runs on same node as workers
 echo "[$(date)] Using PostgreSQL port: ${PG_PORT}"
 
+# Shared directory for flags (must be on network storage so coordinator can see it)
 PG_BASE="${PROJECT_DIR}/.postgres_shared/${RUN_ID}"
-PG_DATA="${PG_BASE}/data"
-PG_SOCKET_DIR="${PG_BASE}/socket"   # not used for connections, but may be left for internal use
 READY_FLAG="${PG_BASE}/.pg_ready"
 STOP_FLAG="${PG_BASE}/.pg_stop"
-mkdir -p "$PG_DATA" "$PG_SOCKET_DIR"
+mkdir -p "$PG_BASE"
 
 # Submit the DB job and wait for it to become ready
 echo "[$(date)] Run ${RUN_ID}: submitting PostgreSQL job on ${NODE}..."
@@ -72,11 +72,12 @@ until [ -f "$READY_FLAG" ]; do
 done
 echo "[$(date)] PostgreSQL ready on port ${PG_PORT}."
 
+# Submit tuning workers
 echo "[$(date)] Submitting ${N_WORKERS} tuning workers on ${NODE}..."
 TUNE_JOB_IDS=()
 for i in $(seq 0 $((N_WORKERS - 1))); do
     JOB_ID=$(sbatch --parsable --nodelist="${NODE}" \
-        --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_PORT="${PG_PORT}",STUDY_NAME="${STUDY_NAME}",TIMEOUT_HOURS="${TUNING_TIMEOUT_HOURS}",WORKER_ID="${i}" \
+        --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_HOST="${PG_HOST}",PG_PORT="${PG_PORT}",STUDY_NAME="${STUDY_NAME}",TIMEOUT_HOURS="${TUNING_TIMEOUT_HOURS}",WORKER_ID="${i}" \
         slurm_better/tuning_worker.sbatch)
     TUNE_JOB_IDS+=("$JOB_ID")
 done
@@ -87,11 +88,12 @@ while squeue -j "$(IFS=,; echo "${TUNE_JOB_IDS[*]}")" -h 2>/dev/null | grep -q .
 done
 echo "[$(date)] Tuning stage finished."
 
+# Submit evaluation workers
 echo "[$(date)] Submitting ${N_WORKERS} evaluation workers on ${NODE}..."
 EVAL_JOB_IDS=()
 for i in $(seq 0 $((N_WORKERS - 1))); do
     JOB_ID=$(sbatch --parsable --nodelist="${NODE}" \
-        --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_PORT="${PG_PORT}",STUDY_NAME="${STUDY_NAME}",WORKER_ID="${i}" \
+        --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_HOST="${PG_HOST}",PG_PORT="${PG_PORT}",STUDY_NAME="${STUDY_NAME}",WORKER_ID="${i}" \
         slurm_better/eval_worker.sbatch)
     EVAL_JOB_IDS+=("$JOB_ID")
 done

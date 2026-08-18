@@ -16,12 +16,12 @@ cd "${PROJECT_DIR}"
 
 trap 'save_results "$SCRATCH" ~"/results/eval-${SLURM_JOB_ID}/task-${WORKER_ID}"' EXIT ERR SIGTERM
 
-STORAGE_URL="postgresql+psycopg2://localhost:${PG_PORT}/optuna_db"
+STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
 
 nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
 import psycopg2, sys
 try:
-    psycopg2.connect(dbname="optuna_db", host="localhost", port="${PG_PORT}").close()
+    psycopg2.connect(dbname="optuna_db", host="${PG_HOST}", port="${PG_PORT}").close()
 except Exception as e:
     print(f"DB connection FAILED: {e}", file=sys.stderr)
     sys.exit(1)
