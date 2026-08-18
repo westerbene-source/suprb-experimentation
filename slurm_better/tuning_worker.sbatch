@@ -29,9 +29,9 @@ PYEOF
 
 TIMEOUT_SECONDS=$(python3 -c "print(int(float('${TIMEOUT_HOURS}') * 3600))")
 
-# Run the tuning script – NO PYTHONPATH override
 nix develop ./slurm_better --no-pure-eval --command \
     env \
+        PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH}" \
         OPTUNA_STORAGE="${STORAGE_URL}" \
         OPTUNA_STUDY_NAME="${STUDY_NAME}" \
         WORKER_TIMEOUT="${TIMEOUT_SECONDS}" \

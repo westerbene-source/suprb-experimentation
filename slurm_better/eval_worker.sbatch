@@ -28,6 +28,7 @@ PYEOF
 
 nix develop ./slurm_better --no-pure-eval --command \
     env \
+        PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH}" \
         OPTUNA_STORAGE="${STORAGE_URL}" \
         OPTUNA_STUDY_NAME="${STUDY_NAME}" \
     python "${PROJECT_DIR}/runs/subsumption/evaluate_only.py" \
