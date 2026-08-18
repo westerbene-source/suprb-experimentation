@@ -86,6 +86,7 @@ optuna.create_study(study_name="${STUDY_NAME}", storage="${STORAGE_URL}", load_i
 PYEOF
 
 # Signal coordinator that we are ready
+echo "[$(date)] touching ready flag"
 touch "$READY_FLAG"
 
 # Heartbeat every 4 minutes to keep the job alive (optional, but good)

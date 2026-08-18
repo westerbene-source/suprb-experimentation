@@ -11,7 +11,6 @@ set -e
 source /projects/shared/lib/slurm-utils.sh
 
 PROJECT_DIR="/home/$USER/suprb-experimentation"
-export PYTHONPATH="${PYTHONPATH}:${PROJECT_DIR}"
 cd "${PROJECT_DIR}"
 
 trap 'save_results "$SCRATCH" ~"/results/eval-${SLURM_JOB_ID}/task-${WORKER_ID}"' EXIT ERR SIGTERM
@@ -29,7 +28,6 @@ PYEOF
 
 nix develop ./slurm_better --no-pure-eval --command \
     env \
-        PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH}" \
         OPTUNA_STORAGE="${STORAGE_URL}" \
         OPTUNA_STUDY_NAME="${STUDY_NAME}" \
     python "${PROJECT_DIR}/runs/subsumption/evaluate_only.py" \
