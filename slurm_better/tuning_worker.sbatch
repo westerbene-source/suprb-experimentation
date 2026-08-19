@@ -4,21 +4,20 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --mem-per-cpu=2G
 #SBATCH --time=26:00:00
-#SBATCH --output=output/tune_%j.out
-#SBATCH --error=output/tune_%j.err
+#SBATCH --output=output/tune_%A_%a.out
+#SBATCH --error=output/tune_%A_%a.err
 set -e
+
+unset SLURM_MEM_PER_NODE
 
 source /projects/shared/lib/slurm-utils.sh
 
 PROJECT_DIR="/home/$USER/suprb-experimentation"
 cd "${PROJECT_DIR}"
 
-trap 'save_results "$SCRATCH" ~"/results/tuning-${SLURM_JOB_ID}/task-${WORKER_ID}"' EXIT ERR SIGTERM
+trap 'save_results "$SCRATCH" ~"/results/tuning-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}"' EXIT ERR SIGTERM
 
 STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
-
-export DEVENV_DOTFILE="${SCRATCH:-/tmp/$USER}/devenv-dotfile-${SLURM_JOB_ID}"
-mkdir -p "$DEVENV_DOTFILE"
 
 # Test DB connectivity
 nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
@@ -40,6 +39,6 @@ nix develop ./slurm_better --no-pure-eval --command \
         WORKER_TIMEOUT="${TIMEOUT_SECONDS}" \
     python "${PROJECT_DIR}/runs/subsumption/tune_only.py" \
         -p "${DATASET}" \
-        -j "${SLURM_JOB_ID}" \
+        -j "${SLURM_ARRAY_JOB_ID}" \
         -o "${OPTIMIZER}" \
-        --worker-id "${WORKER_ID}"
+        --worker-id "${SLURM_ARRAY_TASK_ID}"
