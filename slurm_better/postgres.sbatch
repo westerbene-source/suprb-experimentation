@@ -103,7 +103,7 @@ last_heartbeat=0
 while [ ! -f "$STOP_FLAG" ]; do
     now=$(date +%s)
     if (( now - last_heartbeat >= 240 )); then
-        nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF 2>/dev/null || echo "[$(date)] heartbeat query failed"
+        nix develop ./slurm_better --no-pure-eval --command python - || echo "[$(date)] heartbeat query failed"
 import psycopg2
 conn = psycopg2.connect(dbname="optuna_db", host="localhost", port="${PG_PORT}")
 conn.cursor().execute("SELECT 1;")

@@ -19,6 +19,10 @@ trap 'save_results "$SCRATCH" ~"/results/tuning-${SLURM_ARRAY_JOB_ID}/task-${SLU
 
 STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
 
+# 1. Serialize devenv shell entry (fast — just cleanup + venv reconciliation)
+flock /home/$USER/suprb-experimentation/.devenv.lock \
+    nix develop ./slurm_better --no-pure-eval --command true
+
 # Test DB connectivity
 nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
 import psycopg2, sys
@@ -29,7 +33,8 @@ except Exception as e:
     sys.exit(1)
 PYEOF
 
-TIMEOUT_SECONDS=$(python3 -c "print(int(float('${TIMEOUT_HOURS}') * 3600))")
+TIMEOUT_SECONDS=$(nix develop ./slurm_better --no-pure-eval --command \
+    python -c "print(int(float('${TIMEOUT_HOURS}') * 3600))")
 
 nix develop ./slurm_better --no-pure-eval --command \
     env \

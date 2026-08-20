@@ -19,6 +19,10 @@ trap 'save_results "$SCRATCH" ~"/results/eval-${SLURM_ARRAY_JOB_ID}/task-${SLURM
 
 STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
 
+# 1. Serialize devenv shell entry (fast — just cleanup + venv reconciliation)
+flock /home/$USER/suprb-experimentation/.devenv.lock \
+    nix develop ./slurm_better --no-pure-eval --command true
+
 nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
 import psycopg2, sys
 try:
