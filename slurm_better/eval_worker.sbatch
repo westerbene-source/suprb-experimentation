@@ -15,7 +15,16 @@ source /projects/shared/lib/slurm-utils.sh
 PROJECT_DIR="/home/$USER/suprb-experimentation"
 cd "${PROJECT_DIR}"
 
-trap 'save_results "$SCRATCH" ~"/results/eval-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}"' EXIT ERR SIGTERM
+if [ -n "$USER_SCRATCH" ]; then
+    export XDG_RUNTIME_DIR="${USER_SCRATCH}/xdg_runtime_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
+    mkdir -p "$XDG_RUNTIME_DIR"
+    chmod 700 "$XDG_RUNTIME_DIR"
+    echo "[$(date)] Overrode XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}"
+else
+    echo "Warning: USER_SCRATCH not set, leaving XDG_RUNTIME_DIR as-is — midnight nix develop failures may recur" >&2
+fi
+
+trap 'rm -rf "$XDG_RUNTIME_DIR"; save_results "$SCRATCH" ~"/results/eval-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}"' EXIT SIGTERM
 
 STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
 

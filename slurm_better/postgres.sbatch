@@ -12,6 +12,15 @@ source /projects/shared/lib/slurm-utils.sh
 PROJECT_DIR="/home/$USER/suprb-experimentation"
 cd "${PROJECT_DIR}"
 
+if [ -n "$USER_SCRATCH" ]; then
+    export XDG_RUNTIME_DIR="${USER_SCRATCH}/xdg_runtime_${SLURM_JOB_ID}_${RUN_ID}"
+    mkdir -p "$XDG_RUNTIME_DIR"
+    chmod 700 "$XDG_RUNTIME_DIR"
+    echo "[$(date)] Overrode XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}"
+else
+    echo "Warning: USER_SCRATCH not set, leaving XDG_RUNTIME_DIR as-is — midnight nix develop failures may recur" >&2
+fi
+
 find_free_port() {
     local base=15000
     local max=20000
@@ -87,7 +96,7 @@ except Exception as e:
 PYEOF
     fi
 
-    rm -rf "$PG_DATA" "$PG_SOCKET_DIR"
+    rm -rf "$PG_DATA" "$PG_SOCKET_DIR" "$XDG_RUNTIME_DIR"
     rm -f "$READY_FLAG" "$STOP_FLAG" "${PG_BASE}/.pg_port"
 }
 trap cleanup EXIT
