@@ -54,7 +54,6 @@ rm -f "$STOP_FLAG" "$READY_FLAG"
 
 STORAGE_URL="postgresql://localhost:${PG_PORT}/optuna_db"
 
-# --- Stale-orphan guard ---
 echo "[$(date)] Checking for stale orphaned postgres instances for ${STUDY_NAME}..."
 for pid in $(pgrep -f "postgres.*pg_data_.*_${STUDY_NAME}"); do
     cmdline=$(ps -o args= -p "$pid" 2>/dev/null)
@@ -91,7 +90,7 @@ PYEOF
     rm -rf "$PG_DATA" "$PG_SOCKET_DIR"
     rm -f "$READY_FLAG" "$STOP_FLAG" "${PG_BASE}/.pg_port"
 }
-trap cleanup EXIT ERR SIGTERM
+trap cleanup EXIT
 
 if [ ! -f "$PG_DATA/PG_VERSION" ]; then
     echo "[$(date)] Initialising PostgreSQL data directory..."
@@ -114,7 +113,6 @@ until nix develop ./slurm_better --no-pure-eval --command pg_isready -h localhos
     echo "[$(date)] checking..."
 done
 echo "[$(date)] PostgreSQL is ready."
-
 
 actual_data_dir=$(nix develop ./slurm_better --no-pure-eval --command \
     psql -h localhost -p "$PG_PORT" -d postgres -tAc "SHOW data_directory;" 2>/dev/null)

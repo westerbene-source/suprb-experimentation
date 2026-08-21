@@ -9,6 +9,7 @@
     gcc
     gccStdenv.cc.cc.lib
     libz
+    postgresql_16  
   ];
 
   languages = {
