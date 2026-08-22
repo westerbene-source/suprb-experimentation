@@ -79,10 +79,6 @@ done
 
 # Cleanup: stop PostgreSQL and remove the data directories from USER_SCRATCH
 cleanup() {
-    echo "[$(date)] Cleanup: stopping PostgreSQL..."
-    if ! nix develop ./slurm_better --no-pure-eval --command pg_ctl -D "$PG_DATA" stop -m fast; then
-        echo "[$(date)] WARNING: pg_ctl stop failed or server was already down — check for a lingering process" >&2
-    fi
 
     if [ -f "$READY_FLAG" ]; then
         echo "[$(date)] Exporting study to SQLite..."
@@ -95,6 +91,13 @@ except Exception as e:
     print(f"SQLite export failed: {e}")
 PYEOF
     fi
+
+    echo "[$(date)] Cleanup: stopping PostgreSQL..."
+    if ! nix develop ./slurm_better --no-pure-eval --command pg_ctl -D "$PG_DATA" stop -m fast; then
+        echo "[$(date)] WARNING: pg_ctl stop failed or server was already down — check for a lingering process" >&2
+    fi
+
+    
 
     rm -rf "$PG_DATA" "$PG_SOCKET_DIR" "$XDG_RUNTIME_DIR"
     rm -f "$READY_FLAG" "$STOP_FLAG" "${PG_BASE}/.pg_port"
