@@ -87,7 +87,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferLargerVolume(tolerance=0.05),
+            #subsumption=PreferLargerVolume(tolerance=0.05),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=200,
@@ -95,7 +95,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=worker_random_state,
-        early_stopping_patience=10,
+        #arly_stopping_patience=10,
     )
 
     # Same param_space functions as tune_only.py -- not for suggesting new

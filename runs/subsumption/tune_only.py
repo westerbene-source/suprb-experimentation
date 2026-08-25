@@ -85,22 +85,22 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferLargerVolume(tolerance=0.05),
+            #subsumption=PreferLargerVolume(tolerance=0.05),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=200,
-        n_rules=8,
+        n_iter=32,
+        n_rules=4,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=worker_random_state,
-        early_stopping_patience=10,
+        #early_stopping_patience=10,
     )
 
     storage_url = get_storage_url()
     study_name = os.environ.get("OPTUNA_STUDY_NAME", f"{optimizer}_tuning_{problem}_job{job_id}")
 
-    trials_per_worker = 40
-    timeout_seconds = int(os.environ.get("WORKER_TIMEOUT", 60 * 60 * 24 * 3))
+    trials_per_worker = 400
+    timeout_seconds = int(os.environ.get("WORKER_TIMEOUT", 60 * 60 * 24 * 1))
 
     print(f"[tune] Storage : {storage_url}")
     print(f"[tune] Study   : {study_name}")
