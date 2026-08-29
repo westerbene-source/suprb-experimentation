@@ -164,10 +164,10 @@ def run_multi_seed(
  
 if __name__ == "__main__":
     run_multi_seed(
-        problem="parkinson_total",          # parkinson_total protein_structure airfoil_self_noise concrete_strength combined_cycle_power_plant
+        problem="protein_structure",          # parkinson_total protein_structure airfoil_self_noise concrete_strength combined_cycle_power_plant
         optimizer="spea2",
         n_runs=25,
         base_seed=0,
-        out_path="output/early5_delta0025_extra1_delta0025_200_4_pt.csv",
+        out_path="output/early5_delta0025_extra1_delta0025_200_4_ps.csv",
     )
  

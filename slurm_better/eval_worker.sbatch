@@ -32,14 +32,7 @@ STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
 flock /home/$USER/suprb-experimentation/.devenv.lock \
     nix develop ./slurm_better --no-pure-eval --command true
 
-nix develop ./slurm_better --no-pure-eval --command python - <<PYEOF
-import psycopg2, sys
-try:
-    psycopg2.connect(dbname="optuna_db", host="${PG_HOST}", port="${PG_PORT}").close()
-except Exception as e:
-    print(f"DB connection FAILED: {e}", file=sys.stderr)
-    sys.exit(1)
-PYEOF
+sleep $(( SLURM_ARRAY_TASK_ID % 5 ))
 
 nix develop ./slurm_better --no-pure-eval --command \
     env \
