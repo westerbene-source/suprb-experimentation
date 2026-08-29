@@ -95,7 +95,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=worker_random_state,
-        #arly_stopping_patience=10,
+        #early_stopping_patience=10,
     )
 
     # Same param_space functions as tune_only.py -- not for suggesting new
