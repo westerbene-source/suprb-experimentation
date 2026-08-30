@@ -153,27 +153,8 @@ echo "[$(date)] Touching ready flag..."
 touch "$READY_FLAG"
 
 
-HEARTBEAT_LOG_DIR="${PG_BASE}/heartbeat_logs"
-mkdir -p "$HEARTBEAT_LOG_DIR"
 
-last_heartbeat=0
 while [ ! -f "$STOP_FLAG" ]; do
-    now=$(date +%s)
-    if (( now - last_heartbeat >= 240 )); then
-        hb_log="${HEARTBEAT_LOG_DIR}/hb_$(date +%Y%m%d_%H%M%S).log"
-        if ! nix develop ./slurm_better --no-pure-eval --command python - > "$hb_log" 2>&1 <<PYEOF
-import psycopg2
-conn = psycopg2.connect(dbname="optuna_db", host="localhost", port="${PG_PORT}")
-conn.cursor().execute("SELECT 1;")
-conn.close()
-PYEOF
-        then
-            echo "[$(date)] heartbeat query failed — see ${hb_log}" >&2
-        else
-            # Successful heartbeats don't need their own log file kept around.
-            rm -f "$hb_log"
-        fi
-        last_heartbeat=$now
-    fi
+    
     sleep 10
 done
