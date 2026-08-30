@@ -28,25 +28,21 @@ trap 'rm -rf "$XDG_RUNTIME_DIR"; save_results "$SCRATCH" ~"/results/tuning-${SLU
 
 STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
 
-# 1. Serialize devenv shell entry (fast — just cleanup + venv reconciliation)
-flock /home/$USER/suprb-experimentation/.devenv.lock \
-    nix develop ./slurm_better --no-pure-eval --command true
-
-# Test DB connectivity
 sleep $(( SLURM_ARRAY_TASK_ID % 5 ))
 
+exec 9>"${PROJECT_DIR}/.devenv.lock"
+flock 9
 
-TIMEOUT_SECONDS=$(nix develop ./slurm_better --no-pure-eval --command \
-    python -c "print(int(float('${TIMEOUT_HOURS}') * 3600))")
-
-nix develop ./slurm_better --no-pure-eval --command \
-    env \
-        PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH}" \
-        OPTUNA_STORAGE="${STORAGE_URL}" \
-        OPTUNA_STUDY_NAME="${STUDY_NAME}" \
-        WORKER_TIMEOUT="${TIMEOUT_SECONDS}" \
-    python "${PROJECT_DIR}/runs/subsumption/tune_only.py" \
-        -p "${DATASET}" \
-        -j "${SLURM_ARRAY_JOB_ID}" \
-        -o "${OPTIMIZER}" \
-        --worker-id "${SLURM_ARRAY_TASK_ID}"
+nix develop ./slurm_better --no-pure-eval --command bash -c '
+    flock -u 9
+    exec env \
+        PYTHONPATH="'"${PROJECT_DIR}"':${PYTHONPATH}" \
+        OPTUNA_STORAGE="'"${STORAGE_URL}"'" \
+        OPTUNA_STUDY_NAME="'"${STUDY_NAME}"'" \
+        TIMEOUT_HOURS="'"${TIMEOUT_HOURS}"'" \
+    python "'"${PROJECT_DIR}"'/runs/subsumption/tune_only.py" \
+        -p "'"${DATASET}"'" \
+        -j "'"${SLURM_ARRAY_JOB_ID}"'" \
+        -o "'"${OPTIMIZER}"'" \
+        --worker-id "'"${SLURM_ARRAY_TASK_ID}"'"
+'

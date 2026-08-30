@@ -28,19 +28,21 @@ trap 'rm -rf "$XDG_RUNTIME_DIR"; save_results "$SCRATCH" ~"/results/eval-${SLURM
 
 STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
 
-# 1. Serialize devenv shell entry (fast — just cleanup + venv reconciliation)
-flock /home/$USER/suprb-experimentation/.devenv.lock \
-    nix develop ./slurm_better --no-pure-eval --command true
-
 sleep $(( SLURM_ARRAY_TASK_ID % 5 ))
 
-nix develop ./slurm_better --no-pure-eval --command \
-    env \
-        PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH}" \
-        OPTUNA_STORAGE="${STORAGE_URL}" \
-        OPTUNA_STUDY_NAME="${STUDY_NAME}" \
-    python "${PROJECT_DIR}/runs/subsumption/evaluate_only.py" \
-        -p "${DATASET}" \
-        -j "${SLURM_ARRAY_JOB_ID}" \
-        -o "${OPTIMIZER}" \
-        --worker-id "${SLURM_ARRAY_TASK_ID}"
+
+exec 9>"${PROJECT_DIR}/.devenv.lock"
+flock 9
+
+nix develop ./slurm_better --no-pure-eval --command bash -c '
+    flock -u 9
+    exec env \
+        PYTHONPATH="'"${PROJECT_DIR}"':${PYTHONPATH}" \
+        OPTUNA_STORAGE="'"${STORAGE_URL}"'" \
+        OPTUNA_STUDY_NAME="'"${STUDY_NAME}"'" \
+    python "'"${PROJECT_DIR}"'/runs/subsumption/evaluate_only.py" \
+        -p "'"${DATASET}"'" \
+        -j "'"${SLURM_ARRAY_JOB_ID}"'" \
+        -o "'"${OPTIMIZER}"'" \
+        --worker-id "'"${SLURM_ARRAY_TASK_ID}"'"
+'
