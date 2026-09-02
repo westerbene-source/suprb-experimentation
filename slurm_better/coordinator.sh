@@ -30,7 +30,7 @@ echo "[$(date)] Warming Nix cache..."
 nix develop ./slurm_better --no-pure-eval --command true
 
 RUN_ID="${OPTIMIZER}_${DATASET}"
-STUDY_NAME="${OPTIMIZER}_tuning_${DATASET}_${RUN_ID}"
+STUDY_NAME="${OPTIMIZER}_tuning_${DATASET}"
 
 PG_HOST="localhost"   # DB runs on same node as workers
 
@@ -83,6 +83,15 @@ while squeue -j "${EVAL_ARRAY_ID}" -h | grep -q .; do
     sleep 60
 done
 echo "[$(date)] Evaluation stage finished."
+
+
+echo "[$(date)] Merging per-worker mlruns into shared store..."
+MLRUNS_EVAL_DIR="${HOME}/mlruns-eval-${EVAL_ARRAY_ID}"
+nix develop ./slurm_better --no-pure-eval --command python \
+    "${PROJECT_DIR}/slurm_better/merge_mlruns.py" \
+    --dest "file://${PROJECT_DIR}/mlruns" \
+    --sources ${MLRUNS_EVAL_DIR}/task-*/mlruns
+echo "[$(date)] mlruns merge complete."
 
 echo "[$(date)] Signalling postgres job to export + shut down..."
 touch "$STOP_FLAG"

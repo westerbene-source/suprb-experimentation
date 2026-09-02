@@ -79,18 +79,18 @@ def run_single_cycle(problem: str, seed: int, optimizer: str) -> tuple[SupRB, np
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            #subsumption=PreferSmallerVolume(tolerance=0.01),
+            subsumption=PreferSmallerVolume(tolerance=0.01),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=200,
+        n_iter=32,
         n_rules=4,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=seed,
-        early_stopping_patience=5,
-        early_stopping_delta= 0.0025,
-        extra_rules_patience = 1,
-        extra_rules_delta = 0.0025,
+        #early_stopping_patience=5,
+        #early_stopping_delta= 0.0025,
+        #extra_rules_patience = 1,
+        #extra_rules_delta = 0.0025,
     )
  
     model.fit(X, y)
@@ -164,10 +164,10 @@ def run_multi_seed(
  
 if __name__ == "__main__":
     run_multi_seed(
-        problem="protein_structure",          # parkinson_total protein_structure airfoil_self_noise concrete_strength combined_cycle_power_plant
+        problem="airfoil_self_noise",          # parkinson_total protein_structure airfoil_self_noise concrete_strength combined_cycle_power_plant
         optimizer="spea2",
         n_runs=25,
         base_seed=0,
-        out_path="output/early5_delta0025_extra1_delta0025_200_4_ps.csv",
+        out_path="output/onlysub001_32_4_asn.csv",
     )
  

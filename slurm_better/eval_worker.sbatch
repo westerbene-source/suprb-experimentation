@@ -2,7 +2,7 @@
 #SBATCH --job-name=suprb_eval
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=2
-#SBATCH --mem-per-cpu=4G
+#SBATCH --mem=1G
 #SBATCH --time=06:00:00
 #SBATCH --output=output/eval_%A_%a.out
 #SBATCH --error=output/eval_%A_%a.err
@@ -24,9 +24,19 @@ else
     echo "Warning: USER_SCRATCH not set, leaving XDG_RUNTIME_DIR as-is — midnight nix develop failures may recur" >&2
 fi
 
-trap 'rm -rf "$XDG_RUNTIME_DIR"; save_results "$SCRATCH" ~"/results/eval-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}"' EXIT SIGTERM
 
-STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
+export MLFLOW_TRACKING_URI="file://${SCRATCH}/mlruns"
+
+# save_results(dest, src) - dest first, src second.
+trap 'rm -rf "$XDG_RUNTIME_DIR"; \
+      save_results ~"/mlruns-eval-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}" "${SCRATCH}/mlruns"' EXIT SIGTERM
+
+
+if [ -n "$OPTUNA_STORAGE" ]; then
+    STORAGE_URL="$OPTUNA_STORAGE"
+else
+    STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
+fi
 
 sleep $(( SLURM_ARRAY_TASK_ID % 5 ))
 
@@ -40,6 +50,7 @@ nix develop ./slurm_better --no-pure-eval --command bash -c '
         PYTHONPATH="'"${PROJECT_DIR}"':${PYTHONPATH}" \
         OPTUNA_STORAGE="'"${STORAGE_URL}"'" \
         OPTUNA_STUDY_NAME="'"${STUDY_NAME}"'" \
+        MLFLOW_TRACKING_URI="'"${MLFLOW_TRACKING_URI}"'" \
     python "'"${PROJECT_DIR}"'/runs/subsumption/evaluate_only.py" \
         -p "'"${DATASET}"'" \
         -j "'"${SLURM_ARRAY_JOB_ID}"'" \

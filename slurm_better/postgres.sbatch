@@ -2,7 +2,7 @@
 #SBATCH --job-name=study_postgres
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=3G
+#SBATCH --mem=2G
 #SBATCH --time=120:00:00
 #SBATCH --output=output/postgres_%j.out
 #SBATCH --error=output/postgres_%j.err
