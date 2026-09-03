@@ -12,7 +12,9 @@ unset SLURM_MEM_PER_NODE
 
 source /projects/shared/lib/slurm-utils.sh
 
-PROJECT_DIR="/home/$USER/suprb-experimentation"
+if [ -z "$PROJECT_DIR" ]; then
+    PROJECT_DIR="/home/$USER/suprb-experimentation"
+fi
 cd "${PROJECT_DIR}"
 
 if [ -n "$USER_SCRATCH" ]; then
@@ -24,7 +26,7 @@ else
     echo "Warning: USER_SCRATCH not set, leaving XDG_RUNTIME_DIR as-is — midnight nix develop failures may recur" >&2
 fi
 
-trap 'rm -rf "$XDG_RUNTIME_DIR"; save_results "$SCRATCH" ~"/results/tuning-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}"' EXIT SIGTERM
+trap 'rm -rf "$XDG_RUNTIME_DIR"; save_results "${SCRATCH}" "${PROJECT_DIR}/results/tuning-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}"' EXIT SIGTERM
 
 STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
 

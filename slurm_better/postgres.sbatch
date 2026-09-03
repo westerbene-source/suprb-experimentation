@@ -9,7 +9,9 @@
 
 source /projects/shared/lib/slurm-utils.sh
 
-PROJECT_DIR="/home/$USER/suprb-experimentation"
+if [ -z "$PROJECT_DIR" ]; then
+    PROJECT_DIR="/home/$USER/suprb-experimentation"
+fi
 cd "${PROJECT_DIR}"
 
 if [ -n "$USER_SCRATCH" ]; then

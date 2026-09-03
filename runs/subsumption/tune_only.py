@@ -99,7 +99,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
     storage_url = get_storage_url()
     study_name = os.environ.get("OPTUNA_STUDY_NAME", f"{optimizer}_tuning_{problem}_job{job_id}")
 
-    trials_per_worker = 400
+    trials_per_worker = 4000
     timeout_hours = float(os.environ.get("TIMEOUT_HOURS", 24))
     timeout_seconds = int(timeout_hours * 3600)
 

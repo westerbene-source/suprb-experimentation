@@ -12,7 +12,9 @@ unset SLURM_MEM_PER_NODE
 
 source /projects/shared/lib/slurm-utils.sh
 
-PROJECT_DIR="/home/$USER/suprb-experimentation"
+if [ -z "$PROJECT_DIR" ]; then
+    PROJECT_DIR="/home/$USER/suprb-experimentation"
+fi
 cd "${PROJECT_DIR}"
 
 if [ -n "$USER_SCRATCH" ]; then
@@ -29,7 +31,7 @@ export MLFLOW_TRACKING_URI="file://${SCRATCH}/mlruns"
 
 # save_results(dest, src) - dest first, src second.
 trap 'rm -rf "$XDG_RUNTIME_DIR"; \
-      save_results ~"/mlruns-eval-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}" "${SCRATCH}/mlruns"' EXIT SIGTERM
+      save_results "${PROJECT_DIR}/mlruns-eval-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}" "${SCRATCH}/mlruns"' EXIT SIGTERM
 
 
 if [ -n "$OPTUNA_STORAGE" ]; then
