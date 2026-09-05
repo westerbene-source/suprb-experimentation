@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run inside zellij on oc-head:
 #   zellij
-#   bash slurm_better/coordinator.sh --optimizer spea2 --dataset airfoil_self_noise --n-workers 25
+#   bash slurm_better/coordinator.sh --optimizer spea2 --dataset combined_cycle_power_plant --n-workers 25 --node oc-compute05 --project-dir /home/wolfbene/run1/suprb-experimentation
 set -e
 
 OPTIMIZER="spea2"
@@ -91,7 +91,7 @@ MLRUNS_EVAL_DIR="${PROJECT_DIR}/mlruns-eval-${EVAL_ARRAY_ID}"
 nix develop ./slurm_better --no-pure-eval --command python \
     "${PROJECT_DIR}/slurm_better/merge_mlruns.py" \
     --dest "file://${PROJECT_DIR}/mlruns" \
-    --sources ${MLRUNS_EVAL_DIR}/task-*/mlruns
+    --sources ${MLRUNS_EVAL_DIR}/task-*
 echo "[$(date)] mlruns merge complete."
 
 echo "[$(date)] Signalling postgres job to export + shut down..."
