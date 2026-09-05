@@ -88,7 +88,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
             #subsumption=PreferLargerVolume(tolerance=0.05),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=32,
+        n_iter=200,
         n_rules=4,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
