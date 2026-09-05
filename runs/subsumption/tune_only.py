@@ -93,7 +93,10 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=worker_random_state,
-        #early_stopping_patience=10,
+        early_stopping_patience=5,
+        early_stopping_delta= 0.0025,
+        extra_rules_patience = 1,
+        extra_rules_delta = 0.0025,
     )
 
     storage_url = get_storage_url()
