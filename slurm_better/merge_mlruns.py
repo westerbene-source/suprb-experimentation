@@ -4,9 +4,10 @@ Merge per-worker mlflow local file stores into one shared store.
 
 Each eval worker writes to its own local scratch mlruns/ (to avoid NFS lock
 contention). This script reads each worker's store via the mlflow client API
-and re-creates every run in the destination store, since run/experiment IDs
-and artifact_location paths are local to each store and can't be merged by
-copying files directly.
+and re-creates every run in the destination store, while copying artifacts
+directly from the local source mlruns directory (not via download_artifacts,
+because that uses the stored artifact URI which points to the now-deleted
+scratch directory).
 
 Usage:
     python merge_mlruns.py --dest file:///home/user/suprb-experimentation/mlruns \
@@ -17,7 +18,6 @@ Usage:
 
 import argparse
 import shutil
-import tempfile
 from pathlib import Path
 
 import mlflow
@@ -25,7 +25,13 @@ from mlflow.entities import Metric, Param, RunTag
 from mlflow.tracking import MlflowClient
 
 
-def merge_experiment(src_client: MlflowClient, dst_client: MlflowClient, src_exp, dest_exp_id: str):
+def merge_experiment(
+    src_client: MlflowClient,
+    dst_client: MlflowClient,
+    src_exp,
+    dest_exp_id: str,
+    src_mlruns_path: Path,
+):
     runs = src_client.search_runs(
         experiment_ids=[src_exp.experiment_id],
         max_results=50000,
@@ -45,32 +51,33 @@ def merge_experiment(src_client: MlflowClient, dst_client: MlflowClient, src_exp
         # Params
         params = [Param(k, v) for k, v in data.params.items()]
 
-        # Metrics: fetch full history (not just the latest value)
+        # Metrics: fetch full history
         metrics = []
         for key in data.metrics:
             for m in src_client.get_metric_history(info.run_id, key):
                 metrics.append(Metric(m.key, m.value, m.timestamp, m.step))
 
-        # Tags, keep run_name if present
+        # Tags (skip mlflow internal ones)
         tags = [RunTag(k, v) for k, v in data.tags.items() if not k.startswith("mlflow.")]
 
-        # log_batch has a size limit; chunk if needed
         def chunks(lst, n):
             for i in range(0, len(lst), n):
                 yield lst[i : i + n]
 
-        for m_chunk in chunks(metrics, 900) if metrics else [[]]:
+        for m_chunk in chunks(metrics, 900):
             dst_client.log_batch(new_run_id, metrics=m_chunk, params=[], tags=[])
         if params:
             dst_client.log_batch(new_run_id, metrics=[], params=params, tags=[])
         if tags:
             dst_client.log_batch(new_run_id, metrics=[], params=[], tags=tags)
 
-        # Artifacts
-        with tempfile.TemporaryDirectory() as tmp:
-            local_path = src_client.download_artifacts(info.run_id, "", tmp)
-            if any(Path(local_path).iterdir()):
-                dst_client.log_artifacts(new_run_id, local_path)
+        # -----------------------------------------------------------------
+        # Artifacts: copy directly from the local source mlruns folder
+        # Path: <src_mlruns_path>/<experiment_id>/<run_id>/artifacts
+        artifacts_src = src_mlruns_path / src_exp.experiment_id / info.run_id / "artifacts"
+        if artifacts_src.exists() and any(artifacts_src.iterdir()):
+            dst_client.log_artifacts(new_run_id, str(artifacts_src))
+        # -----------------------------------------------------------------
 
         dst_client.set_terminated(new_run_id, status=info.status, end_time=info.end_time)
 
@@ -106,7 +113,7 @@ def main():
             else:
                 dest_exp_id = dest_exp.experiment_id
 
-            merge_experiment(src_client, dst_client, exp, dest_exp_id)
+            merge_experiment(src_client, dst_client, exp, dest_exp_id, src_path)
 
         if args.delete_sources:
             shutil.rmtree(src_path)
