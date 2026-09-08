@@ -164,10 +164,10 @@ def run_multi_seed(
  
 if __name__ == "__main__":
     run_multi_seed(
-        problem="airfoil_self_noise",          # parkinson_total protein_structure airfoil_self_noise concrete_strength combined_cycle_power_plant
+        problem="concrete_strength",          # parkinson_total protein_structure airfoil_self_noise concrete_strength combined_cycle_power_plant
         optimizer="spea2",
         n_runs=25,
         base_seed=0,
-        out_path="output/onlysub001_32_4_asn.csv",
+        out_path="output/onlysub001_32_4_ccs.csv",
     )
  
