@@ -38,15 +38,32 @@ def merge_experiment(
     )
     print(f"  {len(runs)} runs found in source experiment '{src_exp.name}' ({src_exp.experiment_id})")
 
+    # Process parents before children so mlflow.parentRunId can be remapped
+    # to the new run ID instead of pointing at a run ID that no longer exists.
+    def sort_key(run):
+        return 0 if "mlflow.parentRunId" not in run.data.tags else 1
+
+    runs = sorted(runs, key=sort_key)
+
+    old_to_new_run_id = {}
+
     for run in runs:
         info, data = run.info, run.data
+
+        preserved_tags = {}
+        if "mlflow.runName" in data.tags:
+            preserved_tags["mlflow.runName"] = data.tags["mlflow.runName"]
+        if "mlflow.parentRunId" in data.tags:
+            old_parent_id = data.tags["mlflow.parentRunId"]
+            preserved_tags["mlflow.parentRunId"] = old_to_new_run_id.get(old_parent_id, old_parent_id)
 
         new_run = dst_client.create_run(
             experiment_id=dest_exp_id,
             start_time=info.start_time,
-            tags={k: v for k, v in data.tags.items() if not k.startswith("mlflow.")},
+            tags=preserved_tags,
         )
         new_run_id = new_run.info.run_id
+        old_to_new_run_id[info.run_id] = new_run_id
 
         # Params
         params = [Param(k, v) for k, v in data.params.items()]
@@ -57,7 +74,7 @@ def merge_experiment(
             for m in src_client.get_metric_history(info.run_id, key):
                 metrics.append(Metric(m.key, m.value, m.timestamp, m.step))
 
-        # Tags (skip mlflow internal ones)
+        # Tags (skip mlflow internal ones, those were already preserved above)
         tags = [RunTag(k, v) for k, v in data.tags.items() if not k.startswith("mlflow.")]
 
         def chunks(lst, n):

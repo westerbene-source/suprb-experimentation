@@ -87,7 +87,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferLargerVolume(tolerance=0.01),
+            #subsumption=PreferLargerVolume(tolerance=0.01),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=32,
@@ -179,6 +179,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
     experiment_name = f"Baseline {optimizer} j:{job_id} p:{problem}"
     experiment = Experiment(name=experiment_name, params={"random_state": worker_random_state}, verbose=10)
     experiment.params |= tuned_params
+    experiment.tuned_params_ = tuned_params
 
     evaluation = MOOCrossValidate(
         estimator=estimator, X=X, y=y,
