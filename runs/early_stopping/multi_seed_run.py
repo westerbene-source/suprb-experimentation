@@ -27,6 +27,9 @@ from suprb.logging.multi_objective import MOLogger
 from suprb.logging.stdout import StdoutLogger
 from suprb.optimizer.solution import nsga2, nsga3, spea2
 from suprb.optimizer.rule import es, origin, mutation, ns
+from suprb.optimizer.rule import es, origin, mutation, ns
+from suprb.optimizer.rule.ns.novelty_calculation import NoveltyCalculation  
+from suprb.optimizer.rule.ns.novelty_search_type import MinimalCriteria
 from suprb.rule.subsumption import PreferSmallerVolume, PreferLargerVolume
 from suprb.solution.initialization import RandomInit
 from suprb.rule.matching import OrderedBound, UnorderedBound, CenterSpread, MinPercentage
@@ -70,16 +73,16 @@ def run_single_cycle(problem: str, seed: int, optimizer: str) -> tuple[SupRB, np
     X, y = shuffle(X, y, random_state=seed)
  
     model = SupRB(
-        rule_discovery=es.ES1xLambda(
-            operator="&",
-            n_iter=1000,
-            delay=30,
+        rule_discovery=ns.NoveltySearch(
+            novelty_calculation=NoveltyCalculation(
+                novelty_search_type=MinimalCriteria(min_examples_matched=15)
+            ),
             init=rule.initialization.MeanInit(
                 fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=seed)
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferSmallerVolume(tolerance=0.01),
+            #subsumption=PreferSmallerVolume(tolerance=0.01),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=32,
@@ -164,10 +167,10 @@ def run_multi_seed(
  
 if __name__ == "__main__":
     run_multi_seed(
-        problem="concrete_strength",          # parkinson_total protein_structure airfoil_self_noise concrete_strength combined_cycle_power_plant
+        problem="parkinson_total",          # parkinson_total protein_structure airfoil_self_noise concrete_strength combined_cycle_power_plant
         optimizer="spea2",
         n_runs=25,
         base_seed=0,
-        out_path="output/onlysub001_32_4_ccs.csv",
+        out_path="output/base_32_4_pt.csv",
     )
  

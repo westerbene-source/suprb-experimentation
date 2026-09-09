@@ -64,7 +64,10 @@ def _log_experiment(experiment: Experiment, parent_name: str, depth: int) -> dic
 
         # Log tuning results
         if hasattr(experiment, "tuned_params_"):
-            log_tuning(experiment)
+            if hasattr(experiment, "tuning_results_"):                           #needed to split tune and eval in 2
+                log_tuning(experiment)
+            else:
+                mlflow.log_param("tuned_params", experiment.tuned_params_)
 
         if experiment.experiments:
             # Call log on nested experiments
