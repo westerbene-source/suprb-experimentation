@@ -43,7 +43,7 @@ cd "${PROJECT_DIR}"
 # Define study name and SQLite DB path
 # ----------------------------
 
-STUDY_NAME=
+STUDY_NAME="${OPTIMIZER}_tuning_${DATASET}"
 STUDY_DB="${PROJECT_DIR}/studies/${STUDY_NAME}.db"
 OPTUNA_STORAGE="sqlite:///${STUDY_DB}"
 
