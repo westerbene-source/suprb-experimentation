@@ -2,8 +2,6 @@ import sys
 import os
 
 import numpy as np
-import pandas as pd
-
 import click
 import mlflow
 import optuna
@@ -178,7 +176,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
 
     experiment_name = f"Baseline {optimizer} j:{job_id} p:{problem}"
     experiment = Experiment(name=experiment_name, params={"random_state": worker_random_state}, verbose=10)
-    experiment.params |= tuned_params
+    experiment.params["tuned_params"] = tuned_params
     experiment.tuned_params_ = tuned_params
 
     evaluation = MOOCrossValidate(

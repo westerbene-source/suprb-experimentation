@@ -1,20 +1,14 @@
-import sys
+
 import os
 
 import numpy as np
-import pandas as pd
-
 import click
-import mlflow
 from optuna import Trial
 
 from sklearn.linear_model import Ridge
 from sklearn.utils import Bunch, shuffle
-from sklearn.model_selection import ShuffleSplit
 
 from experiments import Experiment
-from experiments.evaluation import CrossValidate, MOOCrossValidate
-from experiments.mlflow import log_experiment
 from experiments.parameter_search import param_space
 from experiments.parameter_search.optuna import OptunaTuner
 from problems import scale_X_y
@@ -117,7 +111,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
         n_jobs_cv=1,
         n_jobs=1,
         n_calls=trials_per_worker,
-        timeout=timeout_seconds if not sys.gettrace() else 60,
+        timeout=timeout_seconds,
         scoring="test_hypervolume",
         verbose=10,
         study_name=study_name,
