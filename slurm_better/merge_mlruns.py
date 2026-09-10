@@ -41,10 +41,21 @@ def merge_experiment(
     for run in runs:
         info, data = run.info, run.data
 
+        run_name = data.tags.get("mlflow.runName")
+
+        create_tags = {
+            k: v
+            for k, v in data.tags.items()
+            if not k.startswith("mlflow.")
+}
+
+        if run_name is not None:
+            create_tags["mlflow.runName"] = run_name
+
         new_run = dst_client.create_run(
             experiment_id=dest_exp_id,
             start_time=info.start_time,
-            tags={k: v for k, v in data.tags.items() if not k.startswith("mlflow.")},
+            tags=create_tags,
         )
         new_run_id = new_run.info.run_id
 
@@ -58,7 +69,11 @@ def merge_experiment(
                 metrics.append(Metric(m.key, m.value, m.timestamp, m.step))
 
         # Tags (skip mlflow internal ones)
-        tags = [RunTag(k, v) for k, v in data.tags.items() if not k.startswith("mlflow.")]
+        tags = [
+            RunTag(k, v)
+            for k, v in data.tags.items()
+            if not k.startswith("mlflow.") and k != "mlflow.runName"
+        ]
 
         def chunks(lst, n):
             for i in range(0, len(lst), n):
