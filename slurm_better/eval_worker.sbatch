@@ -40,7 +40,7 @@ else
     STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
 fi
 
-sleep $(( SLURM_ARRAY_TASK_ID % 5 ))
+sleep $(( SLURM_ARRAY_TASK_ID % 20 ))
 
 
 exec 9>"${PROJECT_DIR}/.devenv.lock"

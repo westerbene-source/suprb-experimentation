@@ -26,11 +26,13 @@ else
     echo "Warning: USER_SCRATCH not set, leaving XDG_RUNTIME_DIR as-is — midnight nix develop failures may recur" >&2
 fi
 
-trap 'rm -rf "$XDG_RUNTIME_DIR"; save_results "${SCRATCH}" "${PROJECT_DIR}/results/tuning-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}"' EXIT SIGTERM
+export MLFLOW_TRACKING_URI="file://${SCRATCH}/mlruns"
+
+trap 'rm -rf "$XDG_RUNTIME_DIR"; save_results "${PROJECT_DIR}/mlruns-eval-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}" "${SCRATCH}/mlruns"' EXIT SIGTERM
 
 STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"
 
-sleep $(( SLURM_ARRAY_TASK_ID % 5 ))
+sleep $(( SLURM_ARRAY_TASK_ID % 20 ))
 
 exec 9>"${PROJECT_DIR}/.devenv.lock"
 flock 9
@@ -42,6 +44,7 @@ nix develop ./slurm_better --no-pure-eval --command bash -c '
         OPTUNA_STORAGE="'"${STORAGE_URL}"'" \
         OPTUNA_STUDY_NAME="'"${STUDY_NAME}"'" \
         TIMEOUT_HOURS="'"${TIMEOUT_HOURS}"'" \
+        MLFLOW_TRACKING_URI="'"${MLFLOW_TRACKING_URI}"'" \
     python "'"${PROJECT_DIR}"'/runs/subsumption/tune_only.py" \
         -p "'"${DATASET}"'" \
         -j "'"${SLURM_ARRAY_JOB_ID}"'" \

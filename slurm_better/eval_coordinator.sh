@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run inside zellij on oc-head:
 #   zellij
-#   bash slurm_better/eval_coordinator.sh --optimizer spea2 --dataset --n-workers 25 --node oc-compute04 --project-dir _______
+#   bash slurm_better/eval_coordinator.sh --optimizer spea2 --dataset _________ --n-workers 25 --node oc-compute04 --project-dir _______
 set -e
 
 

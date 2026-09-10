@@ -3,12 +3,14 @@ import os
 
 import numpy as np
 import click
+import mlflow
 from optuna import Trial
 
 from sklearn.linear_model import Ridge
 from sklearn.utils import Bunch, shuffle
 
 from experiments import Experiment
+from experiments.mlflow import log_experiment
 from experiments.parameter_search import param_space
 from experiments.parameter_search.optuna import OptunaTuner
 from problems import scale_X_y
@@ -79,18 +81,18 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferLargerVolume(tolerance=0.01),
+            #subsumption=PreferLargerVolume(tolerance=0.01),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=200,
+        n_iter=32,
         n_rules=4,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=worker_random_state,
-        early_stopping_patience=5,
-        early_stopping_delta= 0.0025,
-        extra_rules_patience = 1,
-        extra_rules_delta = 0.0025,
+        #early_stopping_patience=5,
+        #early_stopping_delta= 0.0025,
+        #extra_rules_patience = 1,
+        #extra_rules_delta = 0.0025,
     )
 
     storage_url = get_storage_url()
@@ -185,6 +187,9 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
     # shared study. Passing evaluation=None makes Experiment.perform() skip
     # the evaluation branch entirely after tuning finishes.
     experiment.perform(evaluation=None)
+
+    mlflow.set_experiment(experiment_name)
+    log_experiment(experiment)
 
     print(f"[tune] Worker {worker_id}: finished contributing trials.")
 
