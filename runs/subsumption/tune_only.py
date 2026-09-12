@@ -21,6 +21,8 @@ from suprb.logging.multi_objective import MOLogger
 from suprb.logging.stdout import StdoutLogger
 from suprb.optimizer.solution import nsga2, nsga3, spea2
 from suprb.optimizer.rule import es, origin, mutation, ns
+from suprb.optimizer.rule.ns.novelty_calculation import NoveltyCalculation  
+from suprb.optimizer.rule.ns.novelty_search_type import MinimalCriteria
 from suprb.rule.subsumption import PreferSmallerVolume, PreferLargerVolume
 from suprb.solution.initialization import RandomInit
 
@@ -71,17 +73,16 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
     X, y = shuffle(X, y, random_state=worker_random_state)
 
     estimator = SupRB(
-        rule_discovery=es.ES1xLambda(
-            operator="&",
-            n_iter=1000,
-            delay=30,
+        rule_discovery=ns.NoveltySearch(
+            novelty_calculation=NoveltyCalculation(
+                novelty_search_type=MinimalCriteria(min_examples_matched=0)
+            ),
             init=rule.initialization.MeanInit(
-                fitness=rule.fitness.VolumeWu(),
-                model=Ridge(alpha=0.01, random_state=worker_random_state),
+                fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=worker_random_state)
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            #subsumption=PreferLargerVolume(tolerance=0.01),
+            #subsumption=PreferSmallerVolume(tolerance=0.01),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=32,

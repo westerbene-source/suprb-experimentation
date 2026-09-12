@@ -75,7 +75,7 @@ def run_single_cycle(problem: str, seed: int, optimizer: str) -> tuple[SupRB, np
     model = SupRB(
         rule_discovery=ns.NoveltySearch(
             novelty_calculation=NoveltyCalculation(
-                novelty_search_type=MinimalCriteria(min_examples_matched=15)
+                novelty_search_type=MinimalCriteria(min_examples_matched=0)
             ),
             init=rule.initialization.MeanInit(
                 fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=seed)
@@ -171,6 +171,6 @@ if __name__ == "__main__":
         optimizer="spea2",
         n_runs=25,
         base_seed=0,
-        out_path="output/base_32_4_pt.csv",
+        out_path="output/base_32_4_pt0crit.csv",
     )
  
