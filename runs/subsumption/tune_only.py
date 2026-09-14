@@ -77,7 +77,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
             n_iter=25,
             novelty_calculation=NoveltyCalculation(
                 k_neighbor=15,
-                novelty_search_type=MinimalCriteria(min_examples_matched=0),),
+                novelty_search_type=MinimalCriteria(min_examples_matched=5),),
             init=rule.initialization.HalfnormInit(
                 fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=worker_random_state)
             ),

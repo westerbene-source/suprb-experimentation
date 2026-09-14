@@ -77,13 +77,13 @@ def run_single_cycle(problem: str, seed: int, optimizer: str) -> tuple[SupRB, np
             n_iter=25,
             novelty_calculation=NoveltyCalculation(
                 k_neighbor=15,
-                novelty_search_type=MinimalCriteria(min_examples_matched=0),),
+                novelty_search_type=MinimalCriteria(min_examples_matched=5),),
             init=rule.initialization.HalfnormInit(
                 fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=seed)
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferSmallerVolume(tolerance=0.01),
+            #subsumption=PreferSmallerVolume(tolerance=0.01),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=32,
@@ -172,6 +172,6 @@ if __name__ == "__main__":
         optimizer="spea2",
         n_runs=25,
         base_seed=0,
-        out_path="output/onlysub001_32_4_asn.csv",
+        out_path="output/base_32_4_asn.csv",
     )
  
