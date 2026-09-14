@@ -28,6 +28,9 @@ fi
 
 export MLFLOW_TRACKING_URI="file://${SCRATCH}/mlruns"
 
+echo "Scratch is ${SCRATCH}"
+
+
 trap 'rm -rf "$XDG_RUNTIME_DIR"; save_results "${PROJECT_DIR}/mlruns-eval-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}" "${SCRATCH}/mlruns"' EXIT SIGTERM
 
 STORAGE_URL="postgresql://${PG_HOST}:${PG_PORT}/optuna_db"

@@ -74,15 +74,16 @@ def run_single_cycle(problem: str, seed: int, optimizer: str) -> tuple[SupRB, np
  
     model = SupRB(
         rule_discovery=ns.NoveltySearch(
+            n_iter=25,
             novelty_calculation=NoveltyCalculation(
-                novelty_search_type=MinimalCriteria(min_examples_matched=0)
-            ),
-            init=rule.initialization.MeanInit(
+                k_neighbor=15,
+                novelty_search_type=MinimalCriteria(min_examples_matched=0),),
+            init=rule.initialization.HalfnormInit(
                 fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=seed)
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferSmallerVolume(tolerance=0.10),
+            subsumption=PreferSmallerVolume(tolerance=0.01),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=32,
@@ -91,9 +92,9 @@ def run_single_cycle(problem: str, seed: int, optimizer: str) -> tuple[SupRB, np
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=seed,
         #early_stopping_patience=5,
-        #early_stopping_delta= 0.0015,
-        #extra_rules_patience = 1,
-        #extra_rules_delta = 0.1000,
+        #early_stopping_delta=0.0015,
+        #extra_rules_patience=1,
+        #extra_rules_delta=0.1000,
     )
  
     model.fit(X, y)
@@ -171,6 +172,6 @@ if __name__ == "__main__":
         optimizer="spea2",
         n_runs=25,
         base_seed=0,
-        out_path="output/onlysub010_32_4_ps.csv",
+        out_path="output/onlysub001_32_4_asn.csv",
     )
  

@@ -74,10 +74,11 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
 
     estimator = SupRB(
         rule_discovery=ns.NoveltySearch(
+            n_iter=25,
             novelty_calculation=NoveltyCalculation(
-                novelty_search_type=MinimalCriteria(min_examples_matched=0)
-            ),
-            init=rule.initialization.MeanInit(
+                k_neighbor=15,
+                novelty_search_type=MinimalCriteria(min_examples_matched=0),),
+            init=rule.initialization.HalfnormInit(
                 fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=worker_random_state)
             ),
             mutation=mutation.HalfnormIncrease(),
@@ -85,15 +86,15 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
             #subsumption=PreferSmallerVolume(tolerance=0.01),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=200,
+        n_iter=32,
         n_rules=4,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=worker_random_state,
-        early_stopping_patience=5,
-        early_stopping_delta= 0.0015,
-        extra_rules_patience = 1,
-        extra_rules_delta = 0.1000,
+        #early_stopping_patience=5,
+        #early_stopping_delta=0.0015,
+        #extra_rules_patience=1,
+        #extra_rules_delta=0.1000,
     )
 
     storage_url = get_storage_url()
