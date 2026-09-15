@@ -17,21 +17,20 @@ if [ -z "$PROJECT_DIR" ]; then
 fi
 cd "${PROJECT_DIR}"
 
-if [ -n "$USER_SCRATCH" ]; then
-    export XDG_RUNTIME_DIR="${USER_SCRATCH}/xdg_runtime_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
-    mkdir -p "$XDG_RUNTIME_DIR"
-    chmod 700 "$XDG_RUNTIME_DIR"
-    echo "[$(date)] Overrode XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}"
-else
-    echo "Warning: USER_SCRATCH not set, leaving XDG_RUNTIME_DIR as-is — midnight nix develop failures may recur" >&2
-fi
+#if [ -n "$USER_SCRATCH" ]; then
+#    export XDG_RUNTIME_DIR="${USER_SCRATCH}/xdg_runtime_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
+#    mkdir -p "$XDG_RUNTIME_DIR"
+#    chmod 700 "$XDG_RUNTIME_DIR"
+#    echo "[$(date)] Overrode XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}"
+#else
+#    echo "Warning: USER_SCRATCH not set, leaving XDG_RUNTIME_DIR as-is — midnight nix develop failures may recur" >&2
+#fi
 
 
 export MLFLOW_TRACKING_URI="file://${SCRATCH}/mlruns"
 
 # save_results(dest, src) - dest first, src second.
-trap 'rm -rf "$XDG_RUNTIME_DIR"; \
-      save_results "${PROJECT_DIR}/mlruns-eval-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}" "${SCRATCH}/mlruns"' EXIT SIGTERM
+trap 'save_results "${PROJECT_DIR}/mlruns-eval-${SLURM_ARRAY_JOB_ID}/task-${SLURM_ARRAY_TASK_ID}" "${SCRATCH}/mlruns"' EXIT SIGTERM
 
 
 if [ -n "$OPTUNA_STORAGE" ]; then
