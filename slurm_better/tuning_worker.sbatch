@@ -2,7 +2,7 @@
 #SBATCH --job-name=suprb_tune
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=1G
+#SBATCH --mem=2G
 #SBATCH --time=30:00:00
 #SBATCH --output=output/tune_%A_%a.out
 #SBATCH --error=output/tune_%A_%a.err
