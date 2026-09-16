@@ -83,7 +83,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferSmallerVolume(tolerance=0.01),
+            #subsumption=PreferSmallerVolume(tolerance=0.01),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=32,
@@ -91,10 +91,10 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=worker_random_state,
-        #early_stopping_patience=5,
-        #early_stopping_delta=0.0015,
-        #extra_rules_patience=1,
-        #extra_rules_delta=0.1000,
+        early_stopping_patience=5,
+        early_stopping_delta=0.0015,
+        extra_rules_patience=1,
+        extra_rules_delta=0.1000,
     )
 
     storage_url = get_storage_url()
