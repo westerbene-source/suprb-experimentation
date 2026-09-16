@@ -3,7 +3,7 @@
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=1G
-#SBATCH --time=26:00:00
+#SBATCH --time=30:00:00
 #SBATCH --output=output/tune_%A_%a.out
 #SBATCH --error=output/tune_%A_%a.err
 set -e
