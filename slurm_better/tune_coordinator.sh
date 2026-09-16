@@ -63,7 +63,7 @@ echo "[$(date)] PostgreSQL ready on port ${PG_PORT}."
 echo "[$(date)] Submitting ${N_WORKERS} tuning workers on ${NODE}..."
 TUNE_ARRAY_ID=$(sbatch --parsable --nodelist="${NODE}" \
     --array=0-$((N_WORKERS - 1)) \
-    --export=ALL,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_HOST="${PG_HOST}",PG_PORT="${PG_PORT}",STUDY_NAME="${STUDY_NAME}",TIMEOUT_HOURS="${TUNING_TIMEOUT_HOURS}",PROJECT_DIR="${PROJECT_DIR}" \
+    --export=NONE,OPTIMIZER="${OPTIMIZER}",DATASET="${DATASET}",PG_HOST="${PG_HOST}",PG_PORT="${PG_PORT}",STUDY_NAME="${STUDY_NAME}",TIMEOUT_HOURS="${TUNING_TIMEOUT_HOURS}",PROJECT_DIR="${PROJECT_DIR}" \
     slurm_better/tuning_worker.sbatch)
 echo "[$(date)] Tuning array: ${TUNE_ARRAY_ID}"
 

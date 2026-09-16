@@ -3,7 +3,7 @@
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=2G
-#SBATCH --time=30:00:00
+#SBATCH --time=35:00:00
 #SBATCH --output=output/tune_%A_%a.out
 #SBATCH --error=output/tune_%A_%a.err
 set -e
@@ -26,7 +26,6 @@ cd "${PROJECT_DIR}"
 #    echo "Warning: USER_SCRATCH not set, leaving XDG_RUNTIME_DIR as-is — midnight nix develop failures may recur" >&2
 #fi
 
-export MLFLOW_TRACKING_URI="file://${SCRATCH}/mlruns"
 
 echo "Scratch is ${SCRATCH}"
 
@@ -47,7 +46,6 @@ nix develop ./slurm_better --no-pure-eval --command bash -c '
         OPTUNA_STORAGE="'"${STORAGE_URL}"'" \
         OPTUNA_STUDY_NAME="'"${STUDY_NAME}"'" \
         TIMEOUT_HOURS="'"${TIMEOUT_HOURS}"'" \
-        MLFLOW_TRACKING_URI="'"${MLFLOW_TRACKING_URI}"'" \
     python "'"${PROJECT_DIR}"'/runs/subsumption/tune_only.py" \
         -p "'"${DATASET}"'" \
         -j "'"${SLURM_ARRAY_JOB_ID}"'" \

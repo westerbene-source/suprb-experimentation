@@ -190,9 +190,6 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
     # the evaluation branch entirely after tuning finishes.
     experiment.perform(evaluation=None)
 
-    mlflow.set_experiment(experiment_name)
-    log_experiment(experiment)
-
     print(f"[tune] Worker {worker_id}: finished contributing trials.")
 
 
