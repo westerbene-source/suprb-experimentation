@@ -2,7 +2,7 @@
 #SBATCH --job-name=suprb_eval
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=1G
+#SBATCH --mem=2G
 #SBATCH --time=24:00:00
 #SBATCH --output=output/eval_%A_%a.out
 #SBATCH --error=output/eval_%A_%a.err
@@ -45,8 +45,11 @@ sleep $(( SLURM_ARRAY_TASK_ID % 20 ))
 exec 9>"${PROJECT_DIR}/.devenv.lock"
 flock 9
 
+echo "[$(date)] Worker ${SLURM_ARRAY_TASK_ID}: entering devenv and locked"
+
 nix develop ./slurm_better --no-pure-eval --command bash -c '
     flock -u 9
+    echo "[$(date)] Worker '"${SLURM_ARRAY_TASK_ID}"': devenv entered, lock released"
     exec env \
         PYTHONPATH="'"${PROJECT_DIR}"':${PYTHONPATH}" \
         OPTUNA_STORAGE="'"${STORAGE_URL}"'" \

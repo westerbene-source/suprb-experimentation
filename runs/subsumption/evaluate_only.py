@@ -26,8 +26,12 @@ from suprb.logging.multi_objective import MOLogger
 from suprb.logging.stdout import StdoutLogger
 from suprb.optimizer.solution import nsga2, nsga3, spea2
 from suprb.optimizer.rule import es, origin, mutation, ns
+from suprb.optimizer.rule import es, origin, mutation, ns
+from suprb.optimizer.rule.ns.novelty_calculation import NoveltyCalculation  
+from suprb.optimizer.rule.ns.novelty_search_type import MinimalCriteria
 from suprb.rule.subsumption import PreferSmallerVolume, PreferLargerVolume
 from suprb.solution.initialization import RandomInit
+import suprb.solution.mixing_model as mixing_model
 
 
 random_state = 42
@@ -77,30 +81,31 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
     X, y = shuffle(X, y, random_state=worker_random_state)
 
     estimator = SupRB(
-        rule_discovery=es.ES1xLambda(
-            operator="&",
-            n_iter=1000,
-            delay=30,
-            init=rule.initialization.MeanInit(
-                fitness=rule.fitness.VolumeWu(),
-                model=Ridge(alpha=0.01, random_state=worker_random_state),
+        rule_discovery=ns.NoveltySearch(
+            n_iter=25,
+            novelty_calculation=NoveltyCalculation(
+                k_neighbor=15,
+                novelty_search_type=MinimalCriteria(min_examples_matched=5),),
+            init=rule.initialization.HalfnormInit(
+                fitness=rule.fitness.VolumeWu(), model=Ridge(alpha=0.01, random_state=worker_random_state)
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            #subsumption=PreferLargerVolume(tolerance=0.01),
+            #subsumption=PreferSmallerVolume(tolerance=0.01),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
-        n_iter=200,
+        n_iter=32,
         n_rules=4,
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=worker_random_state,
         #early_stopping_patience=5,
-        #early_stopping_delta= 0.0025,
-        #extra_rules_patience = 1,
-        #extra_rules_delta = 0.0025,
+        #early_stopping_delta=0.0015,
+        #extra_rules_patience=1,
+        #extra_rules_delta=0.0100,
     )
 
+    
     # Same param_space functions as tune_only.py -- not for suggesting new
     # values here, but to replay the best trial through the exact same code
     # path and get back real objects (e.g. an instantiated crossover), not
