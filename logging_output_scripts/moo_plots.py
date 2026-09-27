@@ -14,6 +14,11 @@ import matplotlib.transforms as transforms
 from typing import Dict, List, Tuple, Any, Union, Optional
 import ast
 
+# --- new: condition-tag-based loading + pool-size plot -----------------
+from condition_csv_loader import get_condition_df, get_condition_root_df
+from pool_size_plots import plot_pool_size_growth
+# -------------------------------------------------------------------------
+
 mse = "metrics.test_neg_mean_squared_error"
 complexity = "metrics.elitist_complexity"
 hypervolume = "metrics.hypervolume"
@@ -66,7 +71,7 @@ def c_pareto_sacrifice(moo_front: np.ndarray, ga_front: np.ndarray) -> float:
         return np.nan
     else:
         closest_moo = filtered_moo[np.argmin(filtered_moo[:, 0])]
-        return (closest_moo[0] - ga_sol[0]) * max_rule_pool_size
+        return (closest_moo[0] - ga_sol[0])
 
 
 def e_pareto_sacrifice(moo_front: np.ndarray, ga_front: np.ndarray) -> float:
@@ -274,6 +279,11 @@ def confidence_ellipse(mean, cov, ax, n_std=1.96, color="red", **kwargs):
 
 
 def load_fold_dataframe(heuristic: str, problem: str, cfg: Dict[str, Any]) -> Union[pd.DataFrame, None]:
+    # --- new: tag-based condition loading, bypasses utils.py entirely ---
+    if cfg.get("use_condition_tags"):
+        subdir = cfg["data_directory"].split("/")[-1]
+        return get_condition_df(problem, heuristic, subdir), get_condition_root_df(problem, heuristic, subdir)
+    # ----------------------------------------------------------------------
     if cfg["data_directory"] == "mlruns":
         return get_df(heuristic, problem)
     return get_csv_df(heuristic, problem), get_csv_root_df(heuristic, problem)
@@ -285,26 +295,78 @@ def load_roof_dataframe(heuristic: str, problem: str, cfg: Dict[str, Any]) -> pd
     return get_csv_df(heuristic, problem)
 
 
+def _read_max_genome_length(artifact_path: str) -> int:
+    """
+    Liest n_rules, n_iter, n_initial_rules aus params.json und berechnet
+    max_genome_length_ = n_rules * n_iter + n_initial_rules.
+    Fallback auf die Standard-Config, falls die Datei fehlt oder unvollständig ist.
+    """
+    candidates = [artifact_path]
+    if not os.path.isabs(artifact_path):
+        candidates.append(os.path.abspath(artifact_path))
+        script_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        candidates.append(os.path.join(script_root, artifact_path))
+
+    params_file = None
+    for base in candidates:
+        fp = os.path.join(base, "params.json")
+        if os.path.exists(fp):
+            params_file = fp
+            break
+
+    n_rules, n_iter, n_initial = 4, 32, 0
+    if params_file is not None:
+        try:
+            with open(params_file) as f:
+                params = json.load(f)
+            n_rules   = int(params.get("n_rules", n_rules))
+            n_iter    = int(params.get("n_iter", n_iter))
+            n_initial = int(params.get("n_initial_rules", n_initial))
+        except Exception as e:
+            print(f"WARNUNG: params.json nicht lesbar ({params_file}): {e}")
+    else:
+        print(f"WARNUNG: keine params.json unter {artifact_path}, nutze Default 4/32/0")
+
+    return n_rules * n_iter + n_initial
+
+
 def process_artifact_paths(
     current_res: pd.DataFrame,
     renamed_heuristic: str,
     train_pareto_fronts: Dict[str, List[List]],
+    train_pareto_fronts_norm: Dict[str, List[List]],
     train_pareto_solutions: Dict[str, List[List[float]]],
     test_pareto_fronts: Dict[str, List[List]],
+    test_pareto_fronts_norm: Dict[str, List[List]],
     test_pareto_solutions: Dict[str, List[List[float]]],
 ) -> None:
-    for path in current_res["artifact_uri"]:
-        path = path.split("suprb-experimentation/")[-1]
+    for _, row in current_res.iterrows():
+        path = row["artifact_uri"].split("suprb-experimentation/")[-1]
+        max_genome_length = _read_max_genome_length(path)
+
         with open(os.path.join(path, "pareto_fronts.json")) as f:
             train_pf = json.load(f)
             train_pf = train_pf[str(max(int(key) for key in train_pf.keys()))]
-            train_pareto_fronts[renamed_heuristic].append(train_pf)
-            train_pareto_solutions[renamed_heuristic].extend(train_pf)
+
+            # normierte Kopie für Metriken
+            train_pareto_fronts_norm[renamed_heuristic].append([list(pt) for pt in train_pf])
+
+            # denormalisierte Kopie für Plots
+            train_pf_real = [[pt[0] * max_genome_length, pt[1]] for pt in train_pf]
+            train_pareto_fronts[renamed_heuristic].append(train_pf_real)
+            train_pareto_solutions[renamed_heuristic].extend(train_pf_real)
+
         with open(os.path.join(path, "test_pareto_front.json")) as f:
             test_pf = json.load(f)
             test_pf = test_pf["test_pf_fitness"]
-            test_pareto_fronts[renamed_heuristic].append(test_pf)
-            test_pareto_solutions[renamed_heuristic].extend(test_pf)
+
+            # normierte Kopie für Metriken
+            test_pareto_fronts_norm[renamed_heuristic].append([list(pt) for pt in test_pf])
+
+            # denormalisierte Kopie für Plots
+            test_pf_real = [[pt[0] * max_genome_length, pt[1]] for pt in test_pf]
+            test_pareto_fronts[renamed_heuristic].append(test_pf_real)
+            test_pareto_solutions[renamed_heuristic].extend(test_pf_real)
 
 
 def prepare_soo_stats(
@@ -362,8 +424,8 @@ def plot_hexbin(
     )
 
     # Add plot_type to title if it's not "test" (for backward compatibility)
-    display_title = f"{title}" if plot_type == "test" else f"{title} ({plot_type.capitalize()})"
-    fig_hex.suptitle(display_title)
+    #display_title = f"{title}" if plot_type == "test" else f"{title} ({plot_type.capitalize()})"
+    #fig_hex.suptitle(display_title)
 
     hb_list = []  # collect hexbin artists so we can unify their scale afterwards
     gridsize = 30
@@ -378,15 +440,17 @@ def plot_hexbin(
             continue
 
         algo_df = pd.DataFrame(
-            {"Normed Complexity": pareto_solutions[algo][:, 0], "Pseudo Accuracy": pareto_solutions[algo][:, 1]}
+            {"Complexity": pareto_solutions[algo][:, 0],   # schon echte Regeln
+             "Pseudo Accuracy": pareto_solutions[algo][:, 1]}
         )
         hb = axes_hex[i % n_rows, i // n_rows].hexbin(
-            algo_df["Normed Complexity"],
+            algo_df["Complexity"],
             algo_df["Pseudo Accuracy"],
             gridsize=gridsize,
             cmap="Blues" if plot_type == "test" else "Oranges",
-            extent=(0, 1, 0, 1),
             mincnt=1,
+            #extent=(0, 1, 0, 1) if len(moo_heuristics) != 1 else None,
+            #mincnt=1,
         )
         hb_list.append(hb)
         axes_hex[i % n_rows, i // n_rows].set_title(f"{algo}")
@@ -758,6 +822,71 @@ def compute_nan_percentage_per_algo(
         out[algo] = 100.0 * n_nans / float(total)
     return out
 
+def _e_to_mse(e: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    """Inverse von e = 1 - exp(-2 * MSE):  MSE = -ln(1 - e) / 2."""
+    e_clipped = np.clip(e, 0.0, 1.0 - 1e-12)   # e == 1 -> unendlich, abfangen
+    return -np.log(1.0 - e_clipped) / 2.0
+
+
+def plot_pareto_histograms(
+    moo_heuristics: List[str],
+    pareto_fronts: Dict[str, List[List]],
+    final_output_dir: str,
+    dataset_key: str,
+    title: str,
+    plot_type: str = "test",
+) -> None:
+    """
+    Für jede Heuristik eine Figure mit zwei Histogrammen:
+      links:  Complexity als Anzahl Regeln (Rohwerte)
+      rechts: Fehler als MSE (Absolutwerte)
+    Verwendet die denormalisierten Pareto-Fronts.
+    """
+    if not moo_heuristics:
+        return
+
+    for algo in moo_heuristics:
+        fronts = pareto_fronts.get(algo, [])
+        if not fronts:
+            continue
+
+        complexities: List[float] = []
+        mses: List[float] = []
+        for front in fronts:
+            arr = np.asarray(front, dtype=float)
+            if arr.size == 0:
+                continue
+            complexities.extend(arr[:, 0].tolist())        # bereits in Regeln
+            mses.extend(np.atleast_1d(_e_to_mse(arr[:, 1])).tolist())
+
+        if not complexities:
+            continue
+
+        complexities = np.asarray(complexities)
+        mses = np.asarray(mses)
+
+        fig, axes = plt.subplots(1, 2, figsize=(12, 4.5), constrained_layout=True)
+        fig.suptitle(f"{title} — {algo} ({plot_type.capitalize()})")
+
+        axes[0].hist(complexities, bins="auto", color="steelblue",
+                     edgecolor="black", alpha=0.85)
+        axes[0].set_xlabel("Complexity (rules)")
+        axes[0].set_ylabel("# Pareto solutions")
+        axes[0].set_title("Complexity distribution (absolute)")
+
+        axes[1].hist(mses, bins="auto", color="indianred",
+                     edgecolor="black", alpha=0.85)
+        axes[1].set_xlabel("MSE")
+        axes[1].set_ylabel("# Pareto solutions")
+        axes[1].set_title("Error distribution (absolute MSE)")
+
+        hist_dir = os.path.join(final_output_dir, "figures", "pareto_histograms")
+        os.makedirs(hist_dir, exist_ok=True)
+        safe_algo = re.sub(r"[^\w\-_\. ]", "", algo).replace(" ", "_")
+        fig.savefig(os.path.join(hist_dir, f"{dataset_key}_{safe_algo}_pareto_hist_{plot_type}.png"))
+        plt.close(fig)
+
+
 
 def plot_sampled_pareto_with_refs(
     algo_name: str,
@@ -855,9 +984,11 @@ def create_plots():
     for problem in config["datasets"]:
         counter = 0
         first = True
-        train_pareto_fronts: Dict[str, List[List]] = {}
+        train_pareto_fronts: Dict[str, List[List]] = {}          # denormalisiert (Plots)
+        train_pareto_fronts_norm: Dict[str, List[List]] = {}     # normiert (Metriken)
         train_pareto_solutions: Dict[str, List[List[float]]] = {}
-        test_pareto_fronts: Dict[str, List[List]] = {}
+        test_pareto_fronts: Dict[str, List[List]] = {}           # denormalisiert (Plots)
+        test_pareto_fronts_norm: Dict[str, List[List]] = {}      # normiert (Metriken)
         test_pareto_solutions: Dict[str, List[List[float]]] = {}
         res_var = None
         tuning_info[problem] = {}
@@ -865,8 +996,10 @@ def create_plots():
         # Load runs for all heuristics (MOO and reference)
         for heuristic, renamed_heuristic in all_heuristics.items():
             train_pareto_fronts[renamed_heuristic] = []
+            train_pareto_fronts_norm[renamed_heuristic] = []
             train_pareto_solutions[renamed_heuristic] = []
             test_pareto_fronts[renamed_heuristic] = []
+            test_pareto_fronts_norm[renamed_heuristic] = []
             test_pareto_solutions[renamed_heuristic] = []
 
             fold_df, root_df = load_fold_dataframe(heuristic, problem, config)
@@ -899,8 +1032,10 @@ def create_plots():
                     current_res,
                     renamed_heuristic,
                     train_pareto_fronts,
+                    train_pareto_fronts_norm,
                     train_pareto_solutions,
                     test_pareto_fronts,
+                    test_pareto_fronts_norm,
                     test_pareto_solutions,
                 )
 
@@ -977,24 +1112,49 @@ def create_plots():
                 )
 
         plot_hist(moo_heuristics, train_pareto_fronts, n_cols, n_rows, dataset_title, final_output_dir, dataset_key)
+
+
         plot_iterations_hv(res_var, moo_heuristics, final_output_dir, dataset_key, dataset_title)
+
+        # --- new: rule-pool-size-per-iteration plot (only meaningful in the
+        # condition-tag scheme, since it filters by tags.condition directly) ---
+        if config.get("use_condition_tags"):
+            plot_pool_size_growth(config["heuristics"], problem, final_output_dir, dataset_key)
+        # ------------------------------------------------------------------------
+
+        plot_hist(moo_heuristics, train_pareto_fronts, n_cols, n_rows,
+                  dataset_title, final_output_dir, dataset_key)
+
+        # NEU: Rohwert-Histogramme für Complexity (rules) und MSE
+        plot_pareto_histograms(
+            moo_heuristics,
+            test_pareto_fronts,          # denormalisiert
+            final_output_dir, dataset_key, dataset_title,
+            plot_type="test",
+        )
+        plot_pareto_histograms(
+            moo_heuristics,
+            train_pareto_fronts,         # denormalisiert
+            final_output_dir, dataset_key, dataset_title,
+            plot_type="train",
+        )
 
         moo_heuristics = list(config["heuristics"].values())
 
         # Metrics (filtered to only MOO heuristics in plots)
-        spread_df = compute_metric_dataframe(train_pareto_fronts, metric_spread, "Spread")
+        spread_df = compute_metric_dataframe(train_pareto_fronts_norm, metric_spread, "Spread")
         plot_violin_metric(spread_df, config, problem, final_output_dir, "Spread", allowed_algos=moo_heuristics)
         plot_swarm_box_metric(spread_df, config, problem, final_output_dir, "Spread", allowed_algos=moo_heuristics)
 
         hv_df = compute_metric_dataframe(
-            test_pareto_fronts, metric_hypervolume, "Test Hypervolume", reference_point=np.array([1.0, 1.0])
+            test_pareto_fronts_norm, metric_hypervolume, "Test Hypervolume", reference_point=np.array([1.0, 1.0])
         )
         plot_violin_metric(hv_df, config, problem, final_output_dir, "Test Hypervolume", allowed_algos=moo_heuristics)
         plot_swarm_box_metric(hv_df, config, problem, final_output_dir, "Test Hypervolume", allowed_algos=moo_heuristics)
 
         if len(config["reference_heuristics"]) > 0:
             reference_heuristic = config["reference_heuristics"][list(config["reference_heuristics"].keys())[0]]
-            c_ps, e_ps = compute_pareto_sacrifices_dataframes(test_pareto_fronts, reference_heuristic)
+            c_ps, e_ps = compute_pareto_sacrifices_dataframes(test_pareto_fronts_norm, reference_heuristic)
 
 
             plot_violin_metric(
