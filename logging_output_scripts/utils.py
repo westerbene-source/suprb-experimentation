@@ -102,6 +102,17 @@ def get_df(heuristic, dataset):
     print(f"No run found with {heuristic} and {dataset}")
 
 
+DATASET_ABBREV = {
+    "combined_cycle_power_plant": "CCPP",
+    "airfoil_self_noise":         "ASN",
+    "concrete_strength":          "CS",
+    "protein_structure":          "PPPTS",
+    "parkinson_total":            "PT",
+}
+
+def short_dataset_label(task_key, fallback=None):
+    return DATASET_ABBREV.get(task_key, fallback or task_key)
+
 def get_all_runs(problem):
     print("Get all mlflow runs...")
 

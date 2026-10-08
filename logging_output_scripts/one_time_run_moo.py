@@ -31,15 +31,6 @@ datasets_no_pppts = {
 def mlruns_to_csv(datasets, subdir, normalize):
     all_runs_df = mlflow.search_runs(search_all_experiments=True)
 
-    experiments = mlflow.search_experiments()
-
-    experiment_names = {
-       exp.experiment_id: exp.name
-       for exp in experiments
-    }
-
-    all_runs_df["experiment_name"] = all_runs_df["experiment_id"].map(experiment_names)
-
     print("Dataset\t\t\tMin MSE\tMax MSE\tMin Complexity\tMax Complexity")
     for dataset in datasets:
         mse = "metrics.test_neg_mean_squared_error"
@@ -48,14 +39,8 @@ def mlruns_to_csv(datasets, subdir, normalize):
         sc_iters = "metrics.sc_iterations"
         spread = "metrics.spread"
         test_hypervolume = "metrics.test_hypervolume"
-        df = all_runs_df[
-            all_runs_df["experiment_name"].str.contains(
-                f"p:{dataset}",
-                case=False,
-                na=False,
-            )
-            & (all_runs_df["tags.fold"] == "True")
-        ]
+        df = all_runs_df[all_runs_df["tags.mlflow.runName"].str.contains(
+            dataset, case=False, na=False) & (all_runs_df["tags.fold"] == 'True')]
         df = df[
             ["tags.mlflow.runName", "artifact_uri", mse, complexity, hypervolume, test_hypervolume, spread, sc_iters]]
         print(f"{dataset}\t\t\t{np.min(df[mse]):.4f}\t{np.max(df[mse]):.4f}\t{np.min(df[complexity]):.4f}\t"
@@ -72,6 +57,7 @@ def mlruns_to_csv(datasets, subdir, normalize):
                     np.max(df[complexity]) - np.min(df[complexity]))
         df.to_csv(f"mlruns_csv/{subdir}/{dataset}_all.csv", index=False)
         roots.to_csv(f"mlruns_csv/{subdir}/{dataset}_roots.csv", index=False)
+
 
 
 ga_baseline = {
@@ -272,7 +258,7 @@ if __name__ == '__main__':
     # setting = more_rules
     setting = spea2_only
 
-    current_dataset = {saga_datasets}
+    current_dataset = saga_datasets
 
     mlruns_to_csv(current_dataset,
                 subdir=setting[4].split("/")[-1], normalize=True)

@@ -66,7 +66,7 @@ def get_storage_url() -> str:
 def run(problem: str, job_id: str, optimizer: str, worker_id: int):
     print(f"[tune] Problem: {problem} | optimizer: {optimizer} | job: {job_id} | worker: {worker_id}")
 
-    worker_random_state = random_state + worker_id
+    worker_random_state = random_state + (worker_id*400)
 
     X, y = load_dataset(name=problem, return_X_y=True)
     X, y = scale_X_y(X, y)

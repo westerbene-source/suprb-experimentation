@@ -1,8 +1,5 @@
 """
-Rule-pool-size-over-iterations plot. Reads the 'pool_size' metric's full
-history directly via MLflow's client API (not through the CSV export --
-pool_size is a per-iteration time series, not a single scalar per run, so
-it doesn't fit the existing mlruns_to_csv -> CSV -> get_csv_df path).
+Rule-pool-size-over-iterations plot.
 """
 import os
 
@@ -10,35 +7,40 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mlflow.tracking import MlflowClient
 
+from condition_csv_loader import get_condition_df
+
 
 def plot_pool_size_growth(condition_heuristics: dict, problem: str, final_output_dir: str,
-                           dataset_key: str, tracking_uri: str = None) -> None:
+                           dataset_key: str, subdir: str, tracking_uri: str = None) -> None:
     """
     condition_heuristics: dict mapping condition tag -> display name, e.g.
         {"es_nopruning_noadaptive": "ES Baseline", "es_pruning_noadaptive": "ES + Pruning", ...}
+    subdir: the mlruns_csv subdirectory for this setting (e.g. "FINAL_EVAL_ES"),
+        same value as cfg["data_directory"].split("/")[-1].
     """
     client = MlflowClient(tracking_uri=tracking_uri)
     fig, ax = plt.subplots(dpi=400)
 
     any_data = False
     for condition, display_name in condition_heuristics.items():
-        runs = client.search_runs(
-            search_all_experiments=True,
-            filter_string=(
-                f"tags.condition = '{condition}' "
-                f"and tags.fold = 'True' "
-                f"and tags.`mlflow.runName` LIKE '%p:{problem}%'"
-            ),
-            max_results=5000,
-        )
+        try:
+            df = get_condition_df(problem, condition, subdir)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"[pool_size] {e} -- skipping this line.")
+            continue
+
+        if df.empty or "run_id" not in df.columns:
+            print(f"[pool_size] no run_id data for condition={condition}, problem={problem} -- skipping this line.")
+            continue
+
         all_series = []
-        for run in runs:
-            hist = client.get_metric_history(run.info.run_id, "pool_size")
+        for run_id in df["run_id"]:
+            hist = client.get_metric_history(run_id, "pool_size")
             if hist:
                 all_series.append([(h.step, h.value) for h in hist])
 
         if not all_series:
-            print(f"[pool_size] no data for condition={condition}, problem={problem} -- skipping this line.")
+            print(f"[pool_size] no pool_size metric found for condition={condition}, problem={problem} -- skipping this line.")
             continue
         any_data = True
 

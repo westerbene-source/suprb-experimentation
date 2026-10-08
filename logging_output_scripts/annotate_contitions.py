@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+CHEAP FIX! ONLY USE WHEN YOUE FORGOT TO PUT PROPER EXPERIMENT NAMES
+
 Classifies every fold-run's experimental condition (rule-discovery method,
 pruning on/off, adaptive control on/off) from its logged params.json
 artifact, and writes the result back as MLflow tags:
@@ -10,20 +12,7 @@ artifact, and writes the result back as MLflow tags:
     tags.condition   -> "<rd_method>_<pruning|nopruning>_<adaptive|noadaptive>"
 
 Run this ONCE against the merged mlruns store, after merge_mlruns.py and
-before mlruns_to_csv / the plotting pipeline. Always run with dry_run=True
-first and eyeball the printed condition counts before writing anything.
-
-Classification basis (confirmed from actual params.json files):
-  - rule_discovery starts with "NoveltySearch(" -> ns, else -> es
-  - rule_discovery__subsumption is None/"None"  -> pruning off
-                                 otherwise       -> pruning on   (this is a
-    100% new contribution -- it never existed before pruning was added, so
-    "None" reliably means "no pruning")
-  - early_stopping_patience == -1 AND
-    extra_rules_patience   == -1                -> adaptive off
-    (either != -1)                               -> adaptive on
-    (-1 is SupRB's disabled-feature sentinel, confirmed from your own
-    params.json examples)
+before mlruns_to_csv
 
 Usage:
     python annotate_conditions.py --tracking-uri file:///path/to/merged/mlruns --dry-run
@@ -59,14 +48,22 @@ def classify_condition(params: dict) -> dict:
 
 
 def _params_path_for_run(run) -> str:
-    artifact_dir = run.info.artifact_uri.replace("file://", "")
-    return os.path.join(artifact_dir, "params.json")
+
+    artifact_uri = run.info.artifact_uri
+    if "suprb-experimentation/" in artifact_uri:
+        rel = artifact_uri.split("suprb-experimentation/")[-1]
+        return os.path.join(rel, "params.json")
+    # Fallback for a store that isn't inside a 'suprb-experimentation' dir.
+    return os.path.join(artifact_uri.replace("file://", ""), "params.json")
 
 
 def annotate_all_runs(tracking_uri: str, dry_run: bool = True) -> None:
     client = MlflowClient(tracking_uri=tracking_uri)
-    runs = client.search_runs(search_all_experiments=True, max_results=50000)
-    print(f"Found {len(runs)} total runs in store.")
+    experiment_ids = [exp.experiment_id for exp in client.search_experiments()]
+    runs = []
+    for exp_id in experiment_ids:
+        runs.extend(client.search_runs(experiment_ids=[exp_id], max_results=50000))
+    print(f"Found {len(runs)} total runs across {len(experiment_ids)} experiments.")
 
     condition_counts = Counter()
     missing_by_fold_tag = defaultdict(int)

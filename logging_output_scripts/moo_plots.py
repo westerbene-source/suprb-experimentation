@@ -1,4 +1,4 @@
-from logging_output_scripts.utils import get_csv_df, get_df, get_csv_root_df
+from utils import get_csv_df, get_df, get_csv_root_df
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -1119,7 +1119,8 @@ def create_plots():
         # --- new: rule-pool-size-per-iteration plot (only meaningful in the
         # condition-tag scheme, since it filters by tags.condition directly) ---
         if config.get("use_condition_tags"):
-            plot_pool_size_growth(config["heuristics"], problem, final_output_dir, dataset_key)
+            plot_pool_size_growth(config["heuristics"], problem, final_output_dir, dataset_key,
+                                   subdir=config["data_directory"].split("/")[-1])
         # ------------------------------------------------------------------------
 
         plot_hist(moo_heuristics, train_pareto_fronts, n_cols, n_rows,

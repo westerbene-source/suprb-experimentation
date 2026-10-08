@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import os
 import sys
@@ -6,10 +8,14 @@ import mlflow
 import numpy as np
 import time
 
-from logging_output_scripts import violin_and_swarm_plots
-from logging_output_scripts import moo_plots
-from logging_output_scripts.stat_analysis import calvo, ttest, cohens_pairwise_d
-from logging_output_scripts.utils import filter_runs
+import violin_and_swarm_plots
+import moo_plots
+import stat_analysis
+from stat_analysis import calvo, ttest, cohens_pairwise_d
+from utils import filter_runs
+from condition_csv_loader import get_csv_df_for_condition
+
+stat_analysis.get_csv_df = get_csv_df_for_condition
 
 saga_datasets = {
     "combined_cycle_power_plant": "Combined Cycle Power Plant",
@@ -28,6 +34,22 @@ datasets_no_pppts = {
 }
 
 
+def _read_random_state(artifact_uri: str):
+
+    if "suprb-experimentation/" in artifact_uri:
+        rel = artifact_uri.split("suprb-experimentation/")[-1]
+    else:
+        rel = artifact_uri.replace("file://", "")
+    params_path = os.path.join(rel, "params.json")
+    if not os.path.exists(params_path):
+        return None
+    try:
+        with open(params_path) as f:
+            return json.load(f).get("random_state")
+    except Exception:
+        return None
+
+
 def mlruns_to_csv(datasets, subdir, normalize):
     all_runs_df = mlflow.search_runs(search_all_experiments=True)
 
@@ -40,12 +62,8 @@ def mlruns_to_csv(datasets, subdir, normalize):
 
     all_runs_df["experiment_name"] = all_runs_df["experiment_id"].map(experiment_names)
 
-    # Condition tags (written by annotate_conditions.py) and the seed key
-    # (needed for seed-level pairing in the stats) get carried through into
-    # the exported CSVs whenever they're present, without requiring them to
-    # exist (so this still works for older, non-condition-tagged settings).
     extra_cols = [
-        c for c in ["tags.condition", "tags.rd_method", "tags.pruning", "tags.adaptive", "params.random_state"]
+        c for c in ["tags.condition", "tags.rd_method", "tags.pruning", "tags.adaptive"]
         if c in all_runs_df.columns
     ]
 
@@ -66,9 +84,14 @@ def mlruns_to_csv(datasets, subdir, normalize):
             & (all_runs_df["tags.fold"] == "True")
         ]
         df = df[
-            ["tags.mlflow.runName", "artifact_uri", mse, complexity, hypervolume, test_hypervolume, spread, sc_iters]
+            ["tags.mlflow.runName", "artifact_uri", "run_id", mse, complexity, hypervolume, test_hypervolume, spread, sc_iters]
             + extra_cols
-        ]
+        ].copy()
+        df["params.random_state"] = df["artifact_uri"].apply(_read_random_state)
+        n_missing_seed = df["params.random_state"].isna().sum()
+        if n_missing_seed > 0:
+            print(f"  WARNING: {n_missing_seed} row(s) for {dataset} have no readable random_state "
+                  f"(params.json missing or unreadable at that path) -- these rows will fail seed pairing.")
         print(f"{dataset}\t\t\t{np.min(df[mse]):.4f}\t{np.max(df[mse]):.4f}\t{np.min(df[complexity]):.4f}\t"
               f"{np.max(df[complexity]):.4f}")
 
@@ -104,9 +127,6 @@ moo_baseline = {
 
 spea2_only = {"Baseline spea2": "SPEA2"}
 
-# --- Final evaluation: condition-tag-based comparisons (2 x 4 design) -----
-# Keys must exactly match the tags.condition values written by
-# annotate_conditions.py.
 final_eval_es = {
     "es_nopruning_noadaptive": "ES Baseline",
     "es_pruning_noadaptive": "ES + Pruning",
@@ -129,7 +149,7 @@ def run_main():
 
     config["output_directory"] = setting[0]
     if not os.path.isdir("diss-graphs/graphs"):
-        os.mkdir("diss-graphs/graphs")
+        os.makedirs("diss-graphs/graphs")
 
     if not os.path.isdir(config["output_directory"]):
         os.makedirs(config["output_directory"])
@@ -147,17 +167,53 @@ def run_main():
     time.sleep(10)
 
     all_runs_df = mlflow.search_runs(search_all_experiments=True)
-    filter_runs(all_runs_df)
+    if not config.get("use_condition_tags"):
+        filter_runs(all_runs_df)
 
     if len(config["heuristics"]) > 1:
         try:
             calvo(ylabel=setting[2])
         except Exception as e:
-            # calvo() lives in stat_analysis.py, which may still filter by
-            # runName substring and not understand condition-tag keys.
             print(f"WARNING: calvo() failed ({type(e).__name__}: {e}) -- continuing without it.")
 
     moo_plots.create_plots()
+
+    if config.get("use_condition_tags"):
+        rd_method = list(config["heuristics"].keys())[0].split("_")[0]  # "es" or "ns"
+        base = f"{rd_method}_nopruning_noadaptive"
+        pruning = f"{rd_method}_pruning_noadaptive"
+        adaptive = f"{rd_method}_nopruning_adaptive"
+        both = f"{rd_method}_pruning_adaptive"
+        pairs = [
+            (base, pruning, "Baseline", "Pruning"),
+            (base, adaptive, "Baseline", "Adaptive"),
+            (base, both, "Baseline", "PruningAdaptive"),
+            (pruning, both, "Pruning", "PruningAdaptive"),
+            (adaptive, both, "Adaptive", "PruningAdaptive"),
+            (pruning, adaptive, "Pruning", "Adaptive"),
+        ]
+
+        try:
+            cohens_pairwise_d(
+                [(p[0], p[1]) for p in pairs],
+                [f"{p[2]} - {p[3]}" for p in pairs],
+            )
+        except Exception as e:
+            print(f"WARNING: cohens_pairwise_d() failed ({type(e).__name__}: {e}) -- continuing without it.")
+
+        summaries_dir = os.path.join(config["output_directory"], "tables", "ttest_summaries")
+        os.makedirs(summaries_dir, exist_ok=True)
+        for cand1, cand2, name1, name2 in pairs:
+            try:
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    ttest(latex=True, cand1=cand1, cand2=cand2, cand1_name=name1, cand2_name=name2)
+                captured = buf.getvalue()
+                print(captured)
+                with open(os.path.join(summaries_dir, f"ttest_{name1}_{name2}.txt"), "w") as f:
+                    f.write(captured)
+            except Exception as e:
+                print(f"WARNING: ttest() failed for {name1} vs {name2} ({type(e).__name__}: {e}) -- continuing.")
 
 
 if __name__ == '__main__':

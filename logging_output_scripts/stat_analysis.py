@@ -40,7 +40,8 @@ from logging_output_scripts.utils import (
 import itertools
 import json
 import math
-from utils import datasets_map
+from utils import datasets_map, short_dataset_label
+from matplotlib.ticker import MaxNLocator
 
 
 pd.options.display.max_rows = 2000
@@ -70,7 +71,7 @@ elitist_complexity = "metrics.elitist_complexity"
 mse = "metrics.test_neg_mean_squared_error"
 
 metrics = {mse: "MSE", elitist_complexity: "Model Complexity"}
-HIGHER_IS_BETTER = ["metrics.hypervolume", "metrics.test_hypervolume"]
+HIGHER_IS_BETTER = ["Hypervolume"]
 
 
 def smart_print(df, latex):
@@ -98,11 +99,29 @@ def load_data(config):
             else:
                 df = get_csv_df(heuristic, problem)
 
+            # --- one row per WORKER (params.random_state), averaging folds ---
+            if "params.random_state" in df.columns:
+                metric_cols = [c for c in config["metrics"].values() if c in df.columns]
+                tag_cols = [c for c in df.columns
+                            if c.startswith("tags.") and c != "tags.fold"]
+                agg = {c: "mean" for c in metric_cols}
+                agg.update({c: "first" for c in tag_cols})
+                df = (
+                    df.dropna(subset=["params.random_state"])
+                      .groupby("params.random_state", as_index=False)
+                      .agg(agg)
+                )
+                df = df.set_index("params.random_state", drop=False)
+                try:
+                    df.index = df.index.astype(int)
+                except (ValueError, TypeError):
+                    pass
+
             dfs.append(df)
             keys.append((heuristic, problem))
 
     if config["normalize_datasets"]:
-        dfs = [df.reset_index() for df in dfs]
+        dfs = [d.reset_index(drop=True) for d in dfs]
 
     df = pd.concat(dfs, keys=keys, names=["algorithm", "task"], verify_integrity=True)
     df = df[config["metrics"].values()]
@@ -244,14 +263,7 @@ def cohens_pairwise_d(candidate_pairs: List[Tuple[str, str]], candidate_pair_nam
     Compute dependent-samples Cohen's d for given algorithm pairs across
     all datasets and metrics and print/save LaTeX tables.
 
-    Parameters
-    ----------
-    candidate_pairs : List[Tuple[str, str]]
-        List of pairs of algorithm ids (as used in the config / df index),
-        e.g. [("Baseline c:ga32", "Baseline c:ga64"), ...].
-    candidate_pair_names : List[str]
-        List of human-readable names for each pair, in the same order as
-        candidate_pairs, e.g. ["GA32 - GA64", ...].
+
     """
     # Basic sanity check
     if len(candidate_pairs) != len(candidate_pair_names):
@@ -284,7 +296,7 @@ def cohens_pairwise_d(candidate_pairs: List[Tuple[str, str]], candidate_pair_nam
             # Preload all y-values for algorithms that appear in any pair
             alg_ids = {alg for pair in candidate_pairs for alg in pair}
             y_values = {
-                alg: df[metric].loc[alg, task_key].to_numpy()
+                alg: df[metric].loc[alg, task_key]
                 for alg in alg_ids
             }
 
@@ -292,8 +304,17 @@ def cohens_pairwise_d(candidate_pairs: List[Tuple[str, str]], candidate_pair_nam
             for (alg1, alg2) in candidate_pairs:
                 y1 = y_values[alg1]
                 y2 = y_values[alg2]
-                # dependent-samples Cohen's d_z: mean(diff) / sd(diff)
-                diff = y1 - y2
+
+                # align on shared workers
+                common = y1.index.intersection(y2.index)
+                if len(common) < 2:
+                    row_vals.append(np.nan)
+                    continue
+
+                y1a = y1.loc[common].to_numpy()
+                y2a = y2.loc[common].to_numpy()
+
+                diff = y1a - y2a
                 d_z = diff.mean() / diff.std(ddof=1)
                 row_vals.append(d_z)
 
@@ -358,6 +379,8 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
     pd.options.mode.chained_assignment = None
 
     hdis = {}
+    probs = {}
+
     for metric in metrics:
         hdis[metrics[metric]] = {}
         probs = {}
@@ -367,24 +390,49 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
         # fig, ax = plt.subplots(len(config["datasets"]), figsize=(textwidth if metrics[metric] == "MSE" else linewidth, 5), dpi=72)
         # fig, ax = plt.subplots(len(config["datasets"]), figsize=(textwidth, 5), dpi=72)
         num_heuristics = len(config["heuristics"])
+        n_rows = math.ceil(len(config["datasets"]) / 2)
         fig, ax = plt.subplots(
-            nrows=math.ceil(len(config["datasets"]) / 2),
+            nrows=n_rows,
             ncols=2,
-            figsize=(8, 0.75 * math.ceil(len(config["datasets"]) / 2) * 2),
-            dpi=72,
+            figsize=(12, 4.0 * n_rows),   # 6" × 4" per subplot
+            dpi=110,
+            constrained_layout=True,       # replaces the manual fig.tight_layout()
         )
         ax = ax.ravel()
-        for i, task in enumerate(config["datasets"]):
-            if metric not in df or (config["data_directory"] == "mlruns_csv/RBML" and metric == elitist_complexity):
-                continue
-            if task in df[metric].loc[cand1]:
-                y1 = df[metric].loc[cand1, task].to_numpy()
-                y2 = df[metric].loc[cand2, task].to_numpy()
-            # # else:
-            # y2 = df[metric].loc[cand1, task].to_numpy()
-            # y1 = df[metric].loc[cand2, task].to_numpy()
 
-            model = cmpbayes.BayesCorrTTest(y1, y2, fraction_test=0.25).fit(num_samples=chosen_sample_num)
+        for i, task in enumerate(config["datasets"]):
+            if metric not in df or (
+                config["data_directory"] == "mlruns_csv/RBML" and metric == elitist_complexity
+            ):
+                continue
+
+            if task not in df[metric].loc[cand1].index:
+                continue
+
+            y1 = df[metric].loc[cand1, task]
+            y2 = df[metric].loc[cand2, task]
+
+            # Align on shared workers (index = params.random_state after load_data aggregation).
+            common = y1.index.intersection(y2.index)
+            if len(common) == 0:
+                print(f"[ttest] No shared workers for {cand1} vs {cand2} on {task}; skipping.")
+                continue
+            if len(common) != max(len(y1), len(y2)):
+                print(
+                    f"[ttest] {task}: paired on {len(common)} shared workers "
+                    f"(had {len(y1)} vs {len(y2)})."
+                )
+
+            y1 = y1.loc[common].to_numpy()
+            y2 = y2.loc[common].to_numpy()
+
+            if len(y1) < 2:
+                print(f"[ttest] Too few paired workers for {cand1} vs {cand2} on {task}; skipping.")
+                continue
+
+            model = cmpbayes.BayesCorrTTest(y1, y2, fraction_test=0.25).fit(
+                num_samples=chosen_sample_num
+            )
 
             # Compute 100(1 - alpha)% high density interval.
             alpha = 0.005
@@ -438,10 +486,12 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
             ax_val.fill_between(x, 0, y, alpha=0.33)
             ax_val.set_xlabel("")
             ax_val.set_ylabel("")
-            ax_val.set_title(f"{config['datasets'][task]}", style="italic", pad=15.0)
+            ax_val.set_title(short_dataset_label(task), style="italic", pad=15.0, fontsize=9,)
 
             # Add HDI lines and values.
-            ax_val.vlines(x=hdi, ymin=-0.1 * max(y), ymax=1.2 * max(y), colors="C1", linestyles="dashed")
+            ax_val.vlines(
+                x=hdi, ymin=-0.1 * max(y), ymax=1.2 * max(y), colors="C1", linestyles="dashed"
+            )
             ax_val.text(
                 x=hdi[0],
                 y=1.3 * max(y),
@@ -462,28 +512,38 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
             )
 
             ax_val.set_ylim(top=1.2 * max(y))
+
             if metrics[metric] == "Model Complexity":
                 # Compute rope for this task.
-                # Remove RS runs.
-                ()
-                d_ = df[metric].unstack("algorithm")[[alg for alg in config["heuristics"]]].stack()
-                # d_ = df[metric]  # .unstack(0).stack()
-                ()
-                # Rope is based on std of the other algorithms.
+                d_ = (
+                    df[metric]
+                    .unstack("algorithm")[[alg for alg in config["heuristics"]]]
+                    .stack()
+                )
                 stds = d_[task].groupby("algorithm").std()
                 rope = stds.mean()
                 rope = [-rope, rope]
 
-                # Add rope lines and values.
-                ax_val.vlines(x=rope, ymin=-0.1 * max(y), ymax=1.2 * max(y), colors="C2", linestyles="dotted")
+                ax_val.vlines(
+                    x=rope,
+                    ymin=-0.1 * max(y),
+                    ymax=1.2 * max(y),
+                    colors="C2",
+                    linestyles="dotted",
+                )
                 ax_val.fill_between(rope, 0, 1.2 * max(y), alpha=0.33, color="C2")
 
                 # Compute probabilities.
                 sample = model.model_.rvs(chosen_sample_num)
 
                 probs[config["datasets"][task]] = {
-                    f"p({cand1_name} practically higher complexity)": (sample < rope[0]).sum() / len(sample),
-                    f"p(practically equivalent)": np.logical_and(rope[0] < sample, sample < rope[1]).sum()
+                    f"p({cand1_name} practically higher complexity)": (sample < rope[0]).sum()
+                    / len(sample),
+                    f"p(practically equivalent)": np.logical_and(
+                        rope[0] < sample, sample < rope[1]
+                    ).sum()
+                    / len(sample),
+                    f"p({cand2_name} practically higher complexity)": (rope[1] < sample).sum()
                     / len(sample),
                     f"p({cand2_name} practically higher complexity)": (rope[1] < sample).sum() / len(sample),
                 }
@@ -492,33 +552,39 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
             ax_val.set_xlabel(xlabel, weight="bold")
             fig.tight_layout()
 
-            nname = "mse" if metric == "metrics.test_neg_mean_squared_error" else "complexity"
+        # ---- end of per-task loop ----
 
-            if metrics[metric] == "MSE":
-                xlabel = f"MSE({cand2_name}) - MSE({cand1_name})"
-                nname = "mse"
-            elif metrics[metric] == "COMP":
-                xlabel = f"COMP({cand2_name}) - COMP({cand1_name})"
-                nname = "complexity"
-            elif metrics[metric] == "Hypervolume":
-                xlabel = f"HV({cand2_name}) - HV({cand1_name})"
-                nname = "hypervolume"
-            else:
-                xlabel = f"{metrics[metric]}({cand2_name}) - {metrics[metric]}({cand1_name})"
-                nname = metrics[metric]
+        nname = "mse" if metric == "metrics.test_neg_mean_squared_error" else "complexity"
 
-            ylabel = "Density"
-            fig.text(0.5, -0.01, xlabel, ha="center")
-            fig.text(0.01, 0.5, ylabel, ha="center", rotation=90)
+        if metrics[metric] == "MSE":
+            xlabel = f"MSE({cand2_name}) - MSE({cand1_name})"
+            nname = "mse"
+        elif metrics[metric] == "COMP":
+            xlabel = f"COMP({cand2_name}) - COMP({cand1_name})"
+            nname = "complexity"
+        elif metrics[metric] == "Hypervolume":
+            xlabel = f"HV({cand2_name}) - HV({cand1_name})"
+            nname = "hypervolume"
+        else:
+            xlabel = f"{metrics[metric]}({cand2_name}) - {metrics[metric]}({cand1_name})"
+            nname = metrics[metric]
 
-            if len(config["datasets"]) % 2 != 0:
-                ax[-1].set_visible(False)
+        ylabel = "Density"
+        fig.text(0.5, -0.01, xlabel, ha="center")
+        fig.text(0.01, 0.5, ylabel, ha="center", rotation=90)
 
-            fig.align_ylabels()
-            fig.tight_layout()
-            fig.savefig(
-                f"{final_output_dir}/ttest_{cand1_name}_{cand2_name}_{nname}.pdf", dpi=fig.dpi, bbox_inches="tight"
-            )
+        if len(config["datasets"]) % 2 != 0:
+            ax[-1].set_visible(False)
+
+        fig.align_ylabels()
+        fig.tight_layout()
+        fig.savefig(
+            f"{final_output_dir}/ttest_{cand1_name}_{cand2_name}_{nname}.pdf",
+            dpi=fig.dpi,
+            bbox_inches="tight",
+        )
+
+    # ---- end of per-metric loop ----
 
     # https://stackoverflow.com/a/67575847/6936216
     hdis_ = hdis
@@ -528,8 +594,7 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
     hdis["bound"] = hdis_melt["value"]
     hdis = hdis.set_index(list(hdis.columns[:-1]))
     hdis = hdis.unstack("kind")
-    # Format both ends first
-    # Format both ends first
+
     lower = hdis["bound", "lower"].apply(lambda x: round_to_n_sig_figs(x, n=2))
     upper = hdis["bound", "upper"].apply(lambda x: round_to_n_sig_figs(x, n=2))
 

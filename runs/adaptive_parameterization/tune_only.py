@@ -1,20 +1,15 @@
-import sys
+
 import os
 
 import numpy as np
-
-
 import click
 import mlflow
-import optuna
 from optuna import Trial
 
 from sklearn.linear_model import Ridge
 from sklearn.utils import Bunch, shuffle
-from sklearn.model_selection import ShuffleSplit
 
 from experiments import Experiment
-from experiments.evaluation import CrossValidate, MOOCrossValidate
 from experiments.mlflow import log_experiment
 from experiments.parameter_search import param_space
 from experiments.parameter_search.optuna import OptunaTuner
@@ -26,13 +21,10 @@ from suprb.logging.multi_objective import MOLogger
 from suprb.logging.stdout import StdoutLogger
 from suprb.optimizer.solution import nsga2, nsga3, spea2
 from suprb.optimizer.rule import es, origin, mutation, ns
-from suprb.optimizer.rule import es, origin, mutation, ns
 from suprb.optimizer.rule.ns.novelty_calculation import NoveltyCalculation  
 from suprb.optimizer.rule.ns.novelty_search_type import MinimalCriteria
 from suprb.rule.subsumption import PreferSmallerVolume, PreferLargerVolume
 from suprb.solution.initialization import RandomInit
-import suprb.solution.mixing_model as mixing_model
-
 
 random_state = 42
 
@@ -72,7 +64,7 @@ def get_storage_url() -> str:
 @click.option("-o", "--optimizer", type=click.STRING, default="nsga2")
 @click.option("--worker-id", type=click.INT, default=0)
 def run(problem: str, job_id: str, optimizer: str, worker_id: int):
-    print(f"[eval] Problem: {problem} | optimizer: {optimizer} | job: {job_id} | worker: {worker_id}")
+    print(f"[tune] Problem: {problem} | optimizer: {optimizer} | job: {job_id} | worker: {worker_id}")
 
     worker_random_state = random_state + (worker_id*400)
 
@@ -91,7 +83,7 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
             ),
             mutation=mutation.HalfnormIncrease(),
             origin_generation=origin.SquaredError(),
-            subsumption=PreferLargerVolume(tolerance=0.01),
+            #subsumption=PreferLargerVolume(tolerance=0.01),
         ),
         solution_composition=opt_dict[optimizer](n_iter=32, population_size=32),
         n_iter=32,
@@ -99,17 +91,38 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
         verbose=10,
         logger=CombinedLogger([("stdout", StdoutLogger()), ("default", MOLogger())]),
         random_state=worker_random_state,
-        #early_stopping_patience=5,
-        #early_stopping_delta= 0.0025,
-        #extra_rules_patience = 1,
-        #extra_rules_delta = 0.0025,
+        early_stopping_patience=5,
+        early_stopping_delta= 0.0025,
+        extra_rules_patience = 1,
+        extra_rules_delta = 0.0025,
+        convergence_metric="hypervolume",                            
     )
 
-    
-    # Same param_space functions as tune_only.py -- not for suggesting new
-    # values here, but to replay the best trial through the exact same code
-    # path and get back real objects (e.g. an instantiated crossover), not
-    # just raw Optuna values.
+    storage_url = get_storage_url()
+    study_name = os.environ.get("OPTUNA_STUDY_NAME", f"{optimizer}_tuning_{problem}_job{job_id}")
+
+    trials_per_worker = 4000
+    timeout_hours = float(os.environ.get("TIMEOUT_HOURS", 24))
+    timeout_seconds = int(timeout_hours * 3600)
+
+    print(f"[tune] Storage : {storage_url}")
+    print(f"[tune] Study   : {study_name}")
+    print(f"[tune] Trials  : {trials_per_worker}  |  Timeout: {timeout_seconds}s")
+
+    tuning_params = dict(
+        estimator=estimator,
+        random_state=worker_random_state,
+        cv=4,
+        n_jobs_cv=1,
+        n_jobs=1,
+        n_calls=trials_per_worker,
+        timeout=timeout_seconds,
+        scoring="test_hypervolume",
+        verbose=10,
+        study_name=study_name,
+        storage=storage_url,
+    )
+
     @param_space()
     def suprb_ES_NSGA2_space(trial: Trial, params: Bunch):
         sigma_space = [0, np.sqrt(X.shape[1])]
@@ -167,39 +180,18 @@ def run(problem: str, job_id: str, optimizer: str, worker_id: int):
         "spea2": suprb_ES_SPEA2_space,
     }
 
-    storage_url = get_storage_url()
-    study_name = os.environ.get("OPTUNA_STUDY_NAME", f"{optimizer}_tuning_{problem}_job{job_id}")
-
-    print(f"[eval] Storage : {storage_url}")
-    print(f"[eval] Study   : {study_name}")
-
-    # Read-only: the study must already be fully tuned at this point --
-    # this worker never calls study.optimize().
-    study = optuna.load_study(study_name=study_name, storage=storage_url)
-    best_trial = study.best_trial
-    print(f"[eval] Best trial: #{best_trial.number}, value={best_trial.value}")
-
-    tuned_params = space_dict[optimizer](best_trial)
-
     experiment_name = f"Baseline {optimizer} j:{job_id} p:{problem}"
-    experiment = Experiment(name=experiment_name, params={"random_state": worker_random_state}, verbose=10)
-    experiment.params |= tuned_params
-    experiment.tuned_params_ = tuned_params
+    experiment = Experiment(name=experiment_name, verbose=10)
 
-    evaluation = MOOCrossValidate(
-        estimator=estimator, X=X, y=y,
-        random_state=worker_random_state, verbose=10,
-    )
-    experiment.perform(
-        evaluation,
-        cv=ShuffleSplit(n_splits=8, test_size=0.25, random_state=worker_random_state),
-        n_jobs=1,
-    )
+    tuner = OptunaTuner(X_train=X, y_train=y, **tuning_params)
+    experiment.with_tuning(space_dict[optimizer], tuner=tuner)
 
-    mlflow.set_experiment(experiment_name)
-    log_experiment(experiment)
+    # No evaluation here -- this worker only contributes trials to the
+    # shared study. Passing evaluation=None makes Experiment.perform() skip
+    # the evaluation branch entirely after tuning finishes.
+    experiment.perform(evaluation=None)
 
-    print(f"[eval] Worker {worker_id}: finished evaluating best trial.")
+    print(f"[tune] Worker {worker_id}: finished contributing trials.")
 
 
 if __name__ == "__main__":

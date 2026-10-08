@@ -3,25 +3,13 @@
 Merge per-worker mlflow local file stores into one shared store.
 
 Each eval worker writes to its own local scratch mlruns/ (to avoid NFS lock
-contention). This script reads each worker's store via the mlflow client API
-and re-creates every run in the destination store, while copying artifacts
-directly from the local source mlruns directory (not via download_artifacts,
-because that uses the stored artifact URI which points to the now-deleted
-scratch directory).
-
-Every merged run additionally gets a `source_mlruns_dir` tag recording
-which --sources directory it came from, purely for provenance/debugging
-(e.g. tracing a run with an unexpectedly missing seed back to its original
-run folder). This does NOT replace condition classification -- see
-annotate_conditions.py for that, which reads each run's params.json.
+contention). 
 
 Usage:
-    python merge_mlruns.py --dest file:///home/user/final-eval/mlruns \
-        --sources \
-            /home/wolfbene/ns/run1/suprb-experimentation/mlruns \
-            /home/wolfbene/ns/run2/suprb-experimentation/mlruns \
-            /home/wolfbene/es/run1/suprb-experimentation/mlruns \
-            ...
+    python merge_mlruns.py --dest file:///home/user/suprb-experimentation/mlruns \
+        --sources /home/user/mlruns-eval-8564/task-0/mlruns \
+                  /home/user/mlruns-eval-8564/task-1/mlruns \
+                  ...
 """
 
 import argparse
@@ -39,7 +27,6 @@ def merge_experiment(
     src_exp,
     dest_exp_id: str,
     src_mlruns_path: Path,
-    source_tag: str,
 ):
     runs = src_client.search_runs(
         experiment_ids=[src_exp.experiment_id],
@@ -56,8 +43,7 @@ def merge_experiment(
             k: v
             for k, v in data.tags.items()
             if not k.startswith("mlflow.")
-        }
-        create_tags["source_mlruns_dir"] = source_tag
+}
 
         if run_name is not None:
             create_tags["mlflow.runName"] = run_name
@@ -78,7 +64,7 @@ def merge_experiment(
             for m in src_client.get_metric_history(info.run_id, key):
                 metrics.append(Metric(m.key, m.value, m.timestamp, m.step))
 
-        # Tags (skip mlflow internal ones; source_mlruns_dir already added above)
+        # Tags (skip mlflow internal ones)
         tags = [
             RunTag(k, v)
             for k, v in data.tags.items()
@@ -138,7 +124,7 @@ def main():
             else:
                 dest_exp_id = dest_exp.experiment_id
 
-            merge_experiment(src_client, dst_client, exp, dest_exp_id, src_path, source_tag=str(src_path))
+            merge_experiment(src_client, dst_client, exp, dest_exp_id, src_path)
 
         if args.delete_sources:
             shutil.rmtree(src_path)
