@@ -26,12 +26,15 @@ class OptunaTuner(ParameterTuner):
         tuner: str = "tpe",
         timeout: Optional[float] = None,
         study_name: str = "NoName",
-        storage: Optional[str] = None,   # ← NEW: explicit storage URL
+        storage: Optional[str] = None,  # ← NEW: explicit storage URL
         **kwargs,
     ):
         super().__init__(
-            estimator=estimator, X_train=X_train, y_train=y_train,
-            scoring=scoring, **kwargs,
+            estimator=estimator,
+            X_train=X_train,
+            y_train=y_train,
+            scoring=scoring,
+            **kwargs,
         )
         self.callback = callback
         self.tuner = tuner
@@ -86,7 +89,7 @@ class OptunaTuner(ParameterTuner):
             sampler=sampler,
             study_name=self.study_name,
             storage=storage_url,
-            load_if_exists=True,   # workers safely join an existing study
+            load_if_exists=True,  # workers safely join an existing study
         )
 
         study.optimize(
@@ -94,13 +97,12 @@ class OptunaTuner(ParameterTuner):
             n_trials=self.n_calls,
             n_jobs=self.n_jobs if self.n_jobs is not None else 1,
             timeout=self.timeout,
-            callbacks=self.callback if isinstance(self.callback, list) else
-                       ([self.callback] if self.callback else None),
+            callbacks=self.callback if isinstance(self.callback, list) else ([self.callback] if self.callback else None),
         )
 
         self.tuned_params_ = parameter_space(study.best_trial)
         self.tuning_result_ = Bunch()
         self.tuning_result_.objective_history = [trial.value for trial in study.trials]
-        self.tuning_result_.params_history    = [trial.params for trial in study.trials]
+        self.tuning_result_.params_history = [trial.params for trial in study.trials]
 
         return self.tuned_params_, self.tuning_result_

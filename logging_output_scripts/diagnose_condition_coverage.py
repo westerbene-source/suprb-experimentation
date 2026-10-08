@@ -5,6 +5,7 @@ CHECK FOR ALL MLRUNS
 Usage:
     python diagnose_condition_coverage.py --tracking-uri file:///path/to/mlruns
 """
+
 import argparse
 import json
 import os
@@ -22,12 +23,8 @@ def classify_condition(params: dict) -> str:
     rd_class = rd_raw.split("(")[0].strip()
     rd_method = "ns" if rd_class == "NoveltySearch" else "es"
     pruning_on = params.get("rule_discovery__subsumption") not in (None, "None")
-    adaptive_on = (
-        params.get("early_stopping_patience", -1) != -1
-        or params.get("extra_rules_patience", -1) != -1
-    )
-    return f"{rd_method}_{'pruning' if pruning_on else 'nopruning'}_" \
-           f"{'adaptive' if adaptive_on else 'noadaptive'}"
+    adaptive_on = params.get("early_stopping_patience", -1) != -1 or params.get("extra_rules_patience", -1) != -1
+    return f"{rd_method}_{'pruning' if pruning_on else 'nopruning'}_" f"{'adaptive' if adaptive_on else 'noadaptive'}"
 
 
 def collect_rows(tracking_uri: str) -> pd.DataFrame:
@@ -63,19 +60,23 @@ def collect_rows(tracking_uri: str) -> pd.DataFrame:
             with open(params_path) as f:
                 params = json.load(f)
 
-            rows.append({
-                "dataset": dataset,
-                "condition": classify_condition(params),
-                "seed": params.get("random_state"),
-                "fold_idx": fold_idx,
-                "fold_total": fold_total,
-                "run_id": run.info.run_id,
-                "source_dir": run.data.tags.get("source_mlruns_dir", "<no source_mlruns_dir tag>"),
-                "run_name": run_name,
-            })
+            rows.append(
+                {
+                    "dataset": dataset,
+                    "condition": classify_condition(params),
+                    "seed": params.get("random_state"),
+                    "fold_idx": fold_idx,
+                    "fold_total": fold_total,
+                    "run_id": run.info.run_id,
+                    "source_dir": run.data.tags.get("source_mlruns_dir", "<no source_mlruns_dir tag>"),
+                    "run_name": run_name,
+                }
+            )
 
-    print(f"Parsed {len(rows)} fold-runs. Skipped {unparsed_names} runs with no 'p:<dataset>.fold-k/n' "
-          f"in their name (root/tuning-summary runs, expected), {no_params_json} with no params.json.")
+    print(
+        f"Parsed {len(rows)} fold-runs. Skipped {unparsed_names} runs with no 'p:<dataset>.fold-k/n' "
+        f"in their name (root/tuning-summary runs, expected), {no_params_json} with no params.json."
+    )
     return pd.DataFrame(rows)
 
 
@@ -93,8 +94,10 @@ def report(df: pd.DataFrame) -> None:
         n_seeds = len(seed_counts)
 
         status = "OK" if n_seeds == expected_seeds and n_dup == 0 and n_partial == 0 else "MISMATCH"
-        print(f"\n[{status}] {dataset} / {condition}: {len(group)} rows, {n_seeds} distinct seeds "
-              f"(expected {expected_seeds}) -- {n_ok} clean, {n_dup} duplicated, {n_partial} incomplete")
+        print(
+            f"\n[{status}] {dataset} / {condition}: {len(group)} rows, {n_seeds} distinct seeds "
+            f"(expected {expected_seeds}) -- {n_ok} clean, {n_dup} duplicated, {n_partial} incomplete"
+        )
 
         if n_dup > 0:
             for seed, count in seed_counts[seed_counts > 8].items():

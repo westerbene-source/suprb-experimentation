@@ -1,6 +1,7 @@
 """
 Rule-pool-size-over-iterations plot.
 """
+
 import os
 
 import matplotlib.pyplot as plt
@@ -10,8 +11,9 @@ from mlflow.tracking import MlflowClient
 from condition_csv_loader import get_condition_df
 
 
-def plot_pool_size_growth(condition_heuristics: dict, problem: str, final_output_dir: str,
-                           dataset_key: str, subdir: str, tracking_uri: str = None) -> None:
+def plot_pool_size_growth(
+    condition_heuristics: dict, problem: str, final_output_dir: str, dataset_key: str, subdir: str, tracking_uri: str = None
+) -> None:
     """
     condition_heuristics: dict mapping condition tag -> display name, e.g.
         {"es_nopruning_noadaptive": "ES Baseline", "es_pruning_noadaptive": "ES + Pruning", ...}

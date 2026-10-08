@@ -39,11 +39,7 @@ def merge_experiment(
 
         run_name = data.tags.get("mlflow.runName")
 
-        create_tags = {
-            k: v
-            for k, v in data.tags.items()
-            if not k.startswith("mlflow.")
-}
+        create_tags = {k: v for k, v in data.tags.items() if not k.startswith("mlflow.")}
 
         if run_name is not None:
             create_tags["mlflow.runName"] = run_name
@@ -65,11 +61,7 @@ def merge_experiment(
                 metrics.append(Metric(m.key, m.value, m.timestamp, m.step))
 
         # Tags (skip mlflow internal ones)
-        tags = [
-            RunTag(k, v)
-            for k, v in data.tags.items()
-            if not k.startswith("mlflow.") and k != "mlflow.runName"
-        ]
+        tags = [RunTag(k, v) for k, v in data.tags.items() if not k.startswith("mlflow.") and k != "mlflow.runName"]
 
         def chunks(lst, n):
             for i in range(0, len(lst), n):

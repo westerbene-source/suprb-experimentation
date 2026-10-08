@@ -43,7 +43,6 @@ import math
 from utils import datasets_map, short_dataset_label
 from matplotlib.ticker import MaxNLocator
 
-
 pd.options.display.max_rows = 2000
 # If this doesn't work, because you can't fine Time New Roman as a font do the following:
 # sudo apt install msttcorefonts -qq
@@ -102,15 +101,10 @@ def load_data(config):
             # --- one row per WORKER (params.random_state), averaging folds ---
             if "params.random_state" in df.columns:
                 metric_cols = [c for c in config["metrics"].values() if c in df.columns]
-                tag_cols = [c for c in df.columns
-                            if c.startswith("tags.") and c != "tags.fold"]
+                tag_cols = [c for c in df.columns if c.startswith("tags.") and c != "tags.fold"]
                 agg = {c: "mean" for c in metric_cols}
                 agg.update({c: "first" for c in tag_cols})
-                df = (
-                    df.dropna(subset=["params.random_state"])
-                      .groupby("params.random_state", as_index=False)
-                      .agg(agg)
-                )
+                df = df.dropna(subset=["params.random_state"]).groupby("params.random_state", as_index=False).agg(agg)
                 df = df.set_index("params.random_state", drop=False)
                 try:
                     df.index = df.index.astype(int)
@@ -216,9 +210,9 @@ def calvo(latex=False, all_variants=False, check_mcmc=False, small_set=False, yl
             model = cmpbayes.Calvo(d.to_numpy(), higher_better=False, algorithm_labels=d.columns.to_list()).fit(
                 num_samples=chosen_sample_num, random_seed=1
             )
-            model1 = cmpbayes.Calvo(
-                d.to_numpy(), higher_better=higher_is_better, algorithm_labels=d.columns.to_list()
-            ).fit(num_samples=chosen_sample_num, random_seed=1)
+            model1 = cmpbayes.Calvo(d.to_numpy(), higher_better=higher_is_better, algorithm_labels=d.columns.to_list()).fit(
+                num_samples=chosen_sample_num, random_seed=1
+            )
 
             if check_mcmc:
                 smart_print(az.summary(model.infdata_), latex=latex)
@@ -258,6 +252,7 @@ def calvo(latex=False, all_variants=False, check_mcmc=False, small_set=False, yl
                 bbox_inches="tight",
             )
 
+
 def cohens_pairwise_d(candidate_pairs: List[Tuple[str, str]], candidate_pair_names: List[str]) -> None:
     """
     Compute dependent-samples Cohen's d for given algorithm pairs across
@@ -295,13 +290,10 @@ def cohens_pairwise_d(candidate_pairs: List[Tuple[str, str]], candidate_pair_nam
 
             # Preload all y-values for algorithms that appear in any pair
             alg_ids = {alg for pair in candidate_pairs for alg in pair}
-            y_values = {
-                alg: df[metric].loc[alg, task_key]
-                for alg in alg_ids
-            }
+            y_values = {alg: df[metric].loc[alg, task_key] for alg in alg_ids}
 
             row_vals = []
-            for (alg1, alg2) in candidate_pairs:
+            for alg1, alg2 in candidate_pairs:
                 y1 = y_values[alg1]
                 y2 = y_values[alg2]
 
@@ -324,10 +316,7 @@ def cohens_pairwise_d(candidate_pairs: List[Tuple[str, str]], candidate_pair_nam
             continue
 
         # Build DataFrame: rows = datasets, columns = name combinations
-        data = {
-            comb_labels[k]: [row[1][k] for row in table_rows]
-            for k in range(len(comb_labels))
-        }
+        data = {comb_labels[k]: [row[1][k] for row in table_rows] for k in range(len(comb_labels))}
         index = [row[0] for row in table_rows]
         d_table = pd.DataFrame(data, index=index)
 
@@ -365,6 +354,7 @@ def cohens_pairwise_d(candidate_pairs: List[Tuple[str, str]], candidate_pair_nam
             f_out.write(latex_str)
     return
 
+
 def ttest(latex, cand1, cand2, cand1_name, cand2_name):
     with open("logging_output_scripts/config.json") as f:
         config = json.load(f)
@@ -394,16 +384,14 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
         fig, ax = plt.subplots(
             nrows=n_rows,
             ncols=2,
-            figsize=(12, 4.0 * n_rows),   # 6" × 4" per subplot
+            figsize=(12, 4.0 * n_rows),  # 6" × 4" per subplot
             dpi=110,
-            constrained_layout=True,       # replaces the manual fig.tight_layout()
+            constrained_layout=True,  # replaces the manual fig.tight_layout()
         )
         ax = ax.ravel()
 
         for i, task in enumerate(config["datasets"]):
-            if metric not in df or (
-                config["data_directory"] == "mlruns_csv/RBML" and metric == elitist_complexity
-            ):
+            if metric not in df or (config["data_directory"] == "mlruns_csv/RBML" and metric == elitist_complexity):
                 continue
 
             if task not in df[metric].loc[cand1].index:
@@ -418,10 +406,7 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
                 print(f"[ttest] No shared workers for {cand1} vs {cand2} on {task}; skipping.")
                 continue
             if len(common) != max(len(y1), len(y2)):
-                print(
-                    f"[ttest] {task}: paired on {len(common)} shared workers "
-                    f"(had {len(y1)} vs {len(y2)})."
-                )
+                print(f"[ttest] {task}: paired on {len(common)} shared workers " f"(had {len(y1)} vs {len(y2)}).")
 
             y1 = y1.loc[common].to_numpy()
             y2 = y2.loc[common].to_numpy()
@@ -430,9 +415,7 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
                 print(f"[ttest] Too few paired workers for {cand1} vs {cand2} on {task}; skipping.")
                 continue
 
-            model = cmpbayes.BayesCorrTTest(y1, y2, fraction_test=0.25).fit(
-                num_samples=chosen_sample_num
-            )
+            model = cmpbayes.BayesCorrTTest(y1, y2, fraction_test=0.25).fit(num_samples=chosen_sample_num)
 
             # Compute 100(1 - alpha)% high density interval.
             alpha = 0.005
@@ -461,9 +444,7 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
 
             if not (i == 1 or i == 3):
                 xlabel = (
-                    f"MSE({cand2_name}) - MSE({cand1_name})"
-                    if metrics[metric] == "MSE"
-                    else (f"COMP({cand2_name}) - COMP({cand1_name})\n")
+                    f"MSE({cand2_name}) - MSE({cand1_name})" if metrics[metric] == "MSE" else (f"COMP({cand2_name}) - COMP({cand1_name})\n")
                 )
 
                 ylabel = "Density"
@@ -486,12 +467,15 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
             ax_val.fill_between(x, 0, y, alpha=0.33)
             ax_val.set_xlabel("")
             ax_val.set_ylabel("")
-            ax_val.set_title(short_dataset_label(task), style="italic", pad=15.0, fontsize=9,)
+            ax_val.set_title(
+                short_dataset_label(task),
+                style="italic",
+                pad=15.0,
+                fontsize=9,
+            )
 
             # Add HDI lines and values.
-            ax_val.vlines(
-                x=hdi, ymin=-0.1 * max(y), ymax=1.2 * max(y), colors="C1", linestyles="dashed"
-            )
+            ax_val.vlines(x=hdi, ymin=-0.1 * max(y), ymax=1.2 * max(y), colors="C1", linestyles="dashed")
             ax_val.text(
                 x=hdi[0],
                 y=1.3 * max(y),
@@ -515,11 +499,7 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
 
             if metrics[metric] == "Model Complexity":
                 # Compute rope for this task.
-                d_ = (
-                    df[metric]
-                    .unstack("algorithm")[[alg for alg in config["heuristics"]]]
-                    .stack()
-                )
+                d_ = df[metric].unstack("algorithm")[[alg for alg in config["heuristics"]]].stack()
                 stds = d_[task].groupby("algorithm").std()
                 rope = stds.mean()
                 rope = [-rope, rope]
@@ -537,14 +517,9 @@ def ttest(latex, cand1, cand2, cand1_name, cand2_name):
                 sample = model.model_.rvs(chosen_sample_num)
 
                 probs[config["datasets"][task]] = {
-                    f"p({cand1_name} practically higher complexity)": (sample < rope[0]).sum()
-                    / len(sample),
-                    f"p(practically equivalent)": np.logical_and(
-                        rope[0] < sample, sample < rope[1]
-                    ).sum()
-                    / len(sample),
-                    f"p({cand2_name} practically higher complexity)": (rope[1] < sample).sum()
-                    / len(sample),
+                    f"p({cand1_name} practically higher complexity)": (sample < rope[0]).sum() / len(sample),
+                    f"p(practically equivalent)": np.logical_and(rope[0] < sample, sample < rope[1]).sum() / len(sample),
+                    f"p({cand2_name} practically higher complexity)": (rope[1] < sample).sum() / len(sample),
                     f"p({cand2_name} practically higher complexity)": (rope[1] < sample).sum() / len(sample),
                 }
 

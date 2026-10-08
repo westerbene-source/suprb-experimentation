@@ -4,7 +4,6 @@ import re
 
 import pandas as pd
 
-
 KNOWN_MISSING = set()
 
 _FOLD_SUFFIX = re.compile(r"\.fold-\d+/\d+$")
@@ -27,8 +26,7 @@ def get_condition_df(problem: str, condition: str, subdir: str) -> pd.DataFrame:
     out = df[df["tags.condition"] == condition].reset_index(drop=True)
     if out.empty:
         if (problem, condition) in KNOWN_MISSING:
-            print(f"WARNING: no data for condition={condition!r} on {problem!r} -- listed in KNOWN_MISSING, "
-                  f"continuing without it.")
+            print(f"WARNING: no data for condition={condition!r} on {problem!r} -- listed in KNOWN_MISSING, " f"continuing without it.")
             return df.iloc[0:0].copy()
         available = sorted(df["tags.condition"].dropna().unique().tolist())
         raise ValueError(f"No rows with tags.condition == {condition!r} in {path}. Available: {available}")
@@ -51,8 +49,7 @@ def get_condition_root_df(problem: str, condition: str, subdir: str) -> pd.DataF
     prefixes = set(folds["tags.mlflow.runName"].astype(str).str.replace(_FOLD_SUFFIX, "", regex=True))
     matched = roots[roots["tags.mlflow.runName"].astype(str).isin(prefixes)]
     if matched.empty:
-        print(f"WARNING: no root run matched condition={condition!r} on {problem!r} -- "
-              f"tuning table for it will be empty.")
+        print(f"WARNING: no root run matched condition={condition!r} on {problem!r} -- " f"tuning table for it will be empty.")
     return matched.reset_index(drop=True)
 
 

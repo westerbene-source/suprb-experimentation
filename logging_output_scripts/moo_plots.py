@@ -17,6 +17,7 @@ import ast
 # --- new: condition-tag-based loading + pool-size plot -----------------
 from condition_csv_loader import get_condition_df, get_condition_root_df
 from pool_size_plots import plot_pool_size_growth
+
 # -------------------------------------------------------------------------
 
 mse = "metrics.test_neg_mean_squared_error"
@@ -71,7 +72,7 @@ def c_pareto_sacrifice(moo_front: np.ndarray, ga_front: np.ndarray) -> float:
         return np.nan
     else:
         closest_moo = filtered_moo[np.argmin(filtered_moo[:, 0])]
-        return (closest_moo[0] - ga_sol[0])
+        return closest_moo[0] - ga_sol[0]
 
 
 def e_pareto_sacrifice(moo_front: np.ndarray, ga_front: np.ndarray) -> float:
@@ -132,9 +133,7 @@ def generate_pareto_sacrifice_undefined_table(
         f.write("\n".join(lines))
 
 
-def generate_tuning_tables(
-    tuning_params: Dict[str, Dict[str, Dict]], config: Dict[str, Any], final_output_dir: str
-) -> None:
+def generate_tuning_tables(tuning_params: Dict[str, Dict[str, Dict]], config: Dict[str, Any], final_output_dir: str) -> None:
     """
     Generate one LaTeX table per heuristic (renamed) showing tuned parameter values across datasets.
     Rows: datasets
@@ -257,9 +256,7 @@ def confidence_ellipse(mean, cov, ax, n_std=1.96, color="red", **kwargs):
     # two-dimensional dataset.
     ell_radius_x = np.sqrt(1 + pearson)
     ell_radius_y = np.sqrt(1 - pearson)
-    ellipse = Ellipse(
-        (0, 0), width=ell_radius_x * 2, height=ell_radius_y * 2, facecolor=color, edgecolor=color, **kwargs
-    )
+    ellipse = Ellipse((0, 0), width=ell_radius_x * 2, height=ell_radius_y * 2, facecolor=color, edgecolor=color, **kwargs)
 
     # Calculating the standard deviation of x from
     # the squareroot of the variance and multiplying
@@ -271,9 +268,7 @@ def confidence_ellipse(mean, cov, ax, n_std=1.96, color="red", **kwargs):
 
     ellipse.set_transform(transf + ax.transData)
     ellipse.set_edgecolor(color)
-    ellipse.set_facecolor(
-        (ellipse.get_facecolor()[0], ellipse.get_facecolor()[1], ellipse.get_facecolor()[2], 0.2)
-    )  # 20% alpha for fill
+    ellipse.set_facecolor((ellipse.get_facecolor()[0], ellipse.get_facecolor()[1], ellipse.get_facecolor()[2], 0.2))  # 20% alpha for fill
     ax.add_patch(ellipse)
     return ellipse
 
@@ -319,8 +314,8 @@ def _read_max_genome_length(artifact_path: str) -> int:
         try:
             with open(params_file) as f:
                 params = json.load(f)
-            n_rules   = int(params.get("n_rules", n_rules))
-            n_iter    = int(params.get("n_iter", n_iter))
+            n_rules = int(params.get("n_rules", n_rules))
+            n_iter = int(params.get("n_iter", n_iter))
             n_initial = int(params.get("n_initial_rules", n_initial))
         except Exception as e:
             print(f"WARNUNG: params.json nicht lesbar ({params_file}): {e}")
@@ -372,11 +367,7 @@ def process_artifact_paths(
 def prepare_soo_stats(
     pareto_solutions: Dict[str, np.ndarray], cfg: Dict[str, Any]
 ) -> Tuple[Dict[str, Tuple[np.ndarray, Tuple[str, str]]], Dict[str, Tuple[np.ndarray, Tuple[str, str]]]]:
-    soo_heuristics = [
-        (cfg["heuristics"][algo], ga_baselines[algo])
-        for algo in cfg["heuristics"].keys()
-        if algo in ga_baselines.keys()
-    ]
+    soo_heuristics = [(cfg["heuristics"][algo], ga_baselines[algo]) for algo in cfg["heuristics"].keys() if algo in ga_baselines.keys()]
     soo_averages: Dict[str, Tuple[np.ndarray, Tuple[str, str]]] = {}
     soo_standard_devs: Dict[str, Tuple[np.ndarray, Tuple[str, str]]] = {}
     for algo, style in soo_heuristics:
@@ -424,8 +415,8 @@ def plot_hexbin(
     )
 
     # Add plot_type to title if it's not "test" (for backward compatibility)
-    #display_title = f"{title}" if plot_type == "test" else f"{title} ({plot_type.capitalize()})"
-    #fig_hex.suptitle(display_title)
+    # display_title = f"{title}" if plot_type == "test" else f"{title} ({plot_type.capitalize()})"
+    # fig_hex.suptitle(display_title)
 
     hb_list = []  # collect hexbin artists so we can unify their scale afterwards
     gridsize = 30
@@ -440,8 +431,7 @@ def plot_hexbin(
             continue
 
         algo_df = pd.DataFrame(
-            {"Complexity": pareto_solutions[algo][:, 0],   # schon echte Regeln
-             "Pseudo Accuracy": pareto_solutions[algo][:, 1]}
+            {"Complexity": pareto_solutions[algo][:, 0], "Pseudo Accuracy": pareto_solutions[algo][:, 1]}  # schon echte Regeln
         )
         hb = axes_hex[i % n_rows, i // n_rows].hexbin(
             algo_df["Complexity"],
@@ -449,8 +439,8 @@ def plot_hexbin(
             gridsize=gridsize,
             cmap="Blues" if plot_type == "test" else "Oranges",
             mincnt=1,
-            #extent=(0, 1, 0, 1) if len(moo_heuristics) != 1 else None,
-            #mincnt=1,
+            # extent=(0, 1, 0, 1) if len(moo_heuristics) != 1 else None,
+            # mincnt=1,
         )
         hb_list.append(hb)
         axes_hex[i % n_rows, i // n_rows].set_title(f"{algo}")
@@ -519,9 +509,7 @@ def plot_hist(
         if not pf_lengths:
             continue
         max_length = max(pf_lengths)
-        axes_hist[i // n_cols, i % n_cols].hist(
-            pf_lengths, bins=np.arange(1, max(33, max_length + 1)), align="right", rwidth=0.9
-        )
+        axes_hist[i // n_cols, i % n_cols].hist(pf_lengths, bins=np.arange(1, max(33, max_length + 1)), align="right", rwidth=0.9)
         axes_hist[i // n_cols, i % n_cols].set_title(f"{algo}")
         axes_hist[i // n_cols, i % n_cols].set_xlabel(f"Cardinalities")
     fig_hist.supylabel("# of Pareto fronts")
@@ -532,9 +520,7 @@ def plot_hist(
     plt.close(fig_hist)
 
 
-def plot_iterations_hv(
-    res_var: pd.DataFrame, moo_heuristics: List[str], final_output_dir: str, dataset_key: str, title: str
-) -> None:
+def plot_iterations_hv(res_var: pd.DataFrame, moo_heuristics: List[str], final_output_dir: str, dataset_key: str, title: str) -> None:
     # Determine which heuristics have valid data for Iterations to Hypervolume
     valid_ithv_heuristics: List[str] = []
     # Ensure res_var is not None before proceeding
@@ -585,9 +571,7 @@ def plot_iterations_hv(
     plt.close(fig_ithv)  # Close fig_ithv, not fig_kde
 
 
-def compute_metric_dataframe(
-    pareto_fronts: Dict[str, List[List]], metric: callable, name: str, *args, **kwargs
-) -> pd.DataFrame:
+def compute_metric_dataframe(pareto_fronts: Dict[str, List[List]], metric: callable, name: str, *args, **kwargs) -> pd.DataFrame:
     m_rows = []
     for algo in pareto_fronts.keys():
         for idx, front in enumerate(pareto_fronts[algo]):
@@ -801,9 +785,7 @@ def prepare_reference_stats(
     return averages, covs
 
 
-def compute_nan_percentage_per_algo(
-    metric_df: pd.DataFrame, value_col: str, algo_list: List[str]
-) -> Dict[str, Optional[float]]:
+def compute_nan_percentage_per_algo(metric_df: pd.DataFrame, value_col: str, algo_list: List[str]) -> Dict[str, Optional[float]]:
     """
     Returns a dict algo -> percentage of NaNs in value_col (0..100) or None if no rows for algo.
     """
@@ -822,9 +804,10 @@ def compute_nan_percentage_per_algo(
         out[algo] = 100.0 * n_nans / float(total)
     return out
 
+
 def _e_to_mse(e: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
     """Inverse von e = 1 - exp(-2 * MSE):  MSE = -ln(1 - e) / 2."""
-    e_clipped = np.clip(e, 0.0, 1.0 - 1e-12)   # e == 1 -> unendlich, abfangen
+    e_clipped = np.clip(e, 0.0, 1.0 - 1e-12)  # e == 1 -> unendlich, abfangen
     return -np.log(1.0 - e_clipped) / 2.0
 
 
@@ -856,7 +839,7 @@ def plot_pareto_histograms(
             arr = np.asarray(front, dtype=float)
             if arr.size == 0:
                 continue
-            complexities.extend(arr[:, 0].tolist())        # bereits in Regeln
+            complexities.extend(arr[:, 0].tolist())  # bereits in Regeln
             mses.extend(np.atleast_1d(_e_to_mse(arr[:, 1])).tolist())
 
         if not complexities:
@@ -868,14 +851,12 @@ def plot_pareto_histograms(
         fig, axes = plt.subplots(1, 2, figsize=(12, 4.5), constrained_layout=True)
         fig.suptitle(f"{title} — {algo} ({plot_type.capitalize()})")
 
-        axes[0].hist(complexities, bins="auto", color="steelblue",
-                     edgecolor="black", alpha=0.85)
+        axes[0].hist(complexities, bins="auto", color="steelblue", edgecolor="black", alpha=0.85)
         axes[0].set_xlabel("Complexity (rules)")
         axes[0].set_ylabel("# Pareto solutions")
         axes[0].set_title("Complexity distribution (absolute)")
 
-        axes[1].hist(mses, bins="auto", color="indianred",
-                     edgecolor="black", alpha=0.85)
+        axes[1].hist(mses, bins="auto", color="indianred", edgecolor="black", alpha=0.85)
         axes[1].set_xlabel("MSE")
         axes[1].set_ylabel("# Pareto solutions")
         axes[1].set_title("Error distribution (absolute MSE)")
@@ -885,7 +866,6 @@ def plot_pareto_histograms(
         safe_algo = re.sub(r"[^\w\-_\. ]", "", algo).replace(" ", "_")
         fig.savefig(os.path.join(hist_dir, f"{dataset_key}_{safe_algo}_pareto_hist_{plot_type}.png"))
         plt.close(fig)
-
 
 
 def plot_sampled_pareto_with_refs(
@@ -920,7 +900,9 @@ def plot_sampled_pareto_with_refs(
     n_samples = len(sample_indices)
     n_cols = 4
     n_rows = 2
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4.2 * n_cols, 4.2 * n_rows), sharex=True, sharey=True, constrained_layout=True, squeeze=False)
+    fig, axes = plt.subplots(
+        n_rows, n_cols, figsize=(4.2 * n_cols, 4.2 * n_rows), sharex=True, sharey=True, constrained_layout=True, squeeze=False
+    )
     axes = np.array(axes).reshape(n_rows, n_cols)
     fig.suptitle(f"{dataset_title} — {algo_name} ({plot_type.capitalize()})")
 
@@ -943,7 +925,9 @@ def plot_sampled_pareto_with_refs(
         # Plot single GA elitist point (first item of reference PF) with distinct marker in same color
         if ref_pf.size > 0:
             elitist = ref_pf[0]  # assume first item is the elitist point
-            ax.scatter(elitist[0], elitist[1], s=50, marker="X", color=color, edgecolor="black", linewidth=0.8, label=f"SOO Elitist {k + 1}")
+            ax.scatter(
+                elitist[0], elitist[1], s=50, marker="X", color=color, edgecolor="black", linewidth=0.8, label=f"SOO Elitist {k + 1}"
+            )
 
         ax.set_title(f"Seed $s_{k + 1}$")
         ax.set_xlabel("$c$")
@@ -984,11 +968,11 @@ def create_plots():
     for problem in config["datasets"]:
         counter = 0
         first = True
-        train_pareto_fronts: Dict[str, List[List]] = {}          # denormalisiert (Plots)
-        train_pareto_fronts_norm: Dict[str, List[List]] = {}     # normiert (Metriken)
+        train_pareto_fronts: Dict[str, List[List]] = {}  # denormalisiert (Plots)
+        train_pareto_fronts_norm: Dict[str, List[List]] = {}  # normiert (Metriken)
         train_pareto_solutions: Dict[str, List[List[float]]] = {}
-        test_pareto_fronts: Dict[str, List[List]] = {}           # denormalisiert (Plots)
-        test_pareto_fronts_norm: Dict[str, List[List]] = {}      # normiert (Metriken)
+        test_pareto_fronts: Dict[str, List[List]] = {}  # denormalisiert (Plots)
+        test_pareto_fronts_norm: Dict[str, List[List]] = {}  # normiert (Metriken)
         test_pareto_solutions: Dict[str, List[List[float]]] = {}
         res_var = None
         tuning_info[problem] = {}
@@ -1058,7 +1042,7 @@ def create_plots():
         n_algs = len(moo_heuristics)
         n_cols, n_rows = determine_layout(n_algs)
         dataset_key = datasets_map[problem]
-        dataset_title = config["datasets"][problem] + " (" +  dataset_key.upper() + ")"
+        dataset_title = config["datasets"][problem] + " (" + dataset_key.upper() + ")"
 
         # Plots
         plot_hexbin(
@@ -1113,30 +1097,33 @@ def create_plots():
 
         plot_hist(moo_heuristics, train_pareto_fronts, n_cols, n_rows, dataset_title, final_output_dir, dataset_key)
 
-
         plot_iterations_hv(res_var, moo_heuristics, final_output_dir, dataset_key, dataset_title)
 
         # --- new: rule-pool-size-per-iteration plot (only meaningful in the
         # condition-tag scheme, since it filters by tags.condition directly) ---
         if config.get("use_condition_tags"):
-            plot_pool_size_growth(config["heuristics"], problem, final_output_dir, dataset_key,
-                                   subdir=config["data_directory"].split("/")[-1])
+            plot_pool_size_growth(
+                config["heuristics"], problem, final_output_dir, dataset_key, subdir=config["data_directory"].split("/")[-1]
+            )
         # ------------------------------------------------------------------------
 
-        plot_hist(moo_heuristics, train_pareto_fronts, n_cols, n_rows,
-                  dataset_title, final_output_dir, dataset_key)
+        plot_hist(moo_heuristics, train_pareto_fronts, n_cols, n_rows, dataset_title, final_output_dir, dataset_key)
 
         # NEU: Rohwert-Histogramme für Complexity (rules) und MSE
         plot_pareto_histograms(
             moo_heuristics,
-            test_pareto_fronts,          # denormalisiert
-            final_output_dir, dataset_key, dataset_title,
+            test_pareto_fronts,  # denormalisiert
+            final_output_dir,
+            dataset_key,
+            dataset_title,
             plot_type="test",
         )
         plot_pareto_histograms(
             moo_heuristics,
-            train_pareto_fronts,         # denormalisiert
-            final_output_dir, dataset_key, dataset_title,
+            train_pareto_fronts,  # denormalisiert
+            final_output_dir,
+            dataset_key,
+            dataset_title,
             plot_type="train",
         )
 
@@ -1156,7 +1143,6 @@ def create_plots():
         if len(config["reference_heuristics"]) > 0:
             reference_heuristic = config["reference_heuristics"][list(config["reference_heuristics"].keys())[0]]
             c_ps, e_ps = compute_pareto_sacrifices_dataframes(test_pareto_fronts_norm, reference_heuristic)
-
 
             plot_violin_metric(
                 c_ps,

@@ -18,6 +18,7 @@ Usage:
     python annotate_conditions.py --tracking-uri file:///path/to/merged/mlruns --dry-run
     python annotate_conditions.py --tracking-uri file:///path/to/merged/mlruns
 """
+
 import argparse
 import json
 import os
@@ -33,17 +34,13 @@ def classify_condition(params: dict) -> dict:
 
     pruning_on = params.get("rule_discovery__subsumption") not in (None, "None")
 
-    adaptive_on = (
-        params.get("early_stopping_patience", -1) != -1
-        or params.get("extra_rules_patience", -1) != -1
-    )
+    adaptive_on = params.get("early_stopping_patience", -1) != -1 or params.get("extra_rules_patience", -1) != -1
 
     return {
         "rd_method": rd_method,
         "pruning": "on" if pruning_on else "off",
         "adaptive": "on" if adaptive_on else "off",
-        "condition": f"{rd_method}_{'pruning' if pruning_on else 'nopruning'}_"
-                     f"{'adaptive' if adaptive_on else 'noadaptive'}",
+        "condition": f"{rd_method}_{'pruning' if pruning_on else 'nopruning'}_" f"{'adaptive' if adaptive_on else 'noadaptive'}",
     }
 
 
@@ -90,14 +87,18 @@ def annotate_all_runs(tracking_uri: str, dry_run: bool = True) -> None:
     for cond, count in sorted(condition_counts.items()):
         print(f"  {cond:30s} {count}")
     if len(condition_counts) != 8:
-        print(f"\n  ^^ WARNING: expected exactly 8 distinct conditions, found {len(condition_counts)}. "
-              f"Check the list above before trusting the tagging.")
+        print(
+            f"\n  ^^ WARNING: expected exactly 8 distinct conditions, found {len(condition_counts)}. "
+            f"Check the list above before trusting the tagging."
+        )
 
     print("\n=== Runs with NO params.json, broken down by tags.fold ===")
     for fold_tag, count in missing_by_fold_tag.items():
         print(f"  fold={fold_tag!r:20s} {count}")
-    print("  (Expected: this should be mostly/only root/tuning-summary runs, i.e. fold='True' "
-        "missing here would mean an actual fold run is missing its params.json -- investigate that.)")
+    print(
+        "  (Expected: this should be mostly/only root/tuning-summary runs, i.e. fold='True' "
+        "missing here would mean an actual fold run is missing its params.json -- investigate that.)"
+    )
 
     if dry_run:
         print("\nDRY RUN -- no tags were written. Re-run with --no-dry-run once the counts above look right.")

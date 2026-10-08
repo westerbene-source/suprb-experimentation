@@ -64,7 +64,7 @@ def _log_experiment(experiment: Experiment, parent_name: str, depth: int) -> dic
 
         # Log tuning results
         if hasattr(experiment, "tuned_params_"):
-            if hasattr(experiment, "tuning_results_"):                           #needed to split tune and eval in 2
+            if hasattr(experiment, "tuning_results_"):  # needed to split tune and eval in 2
                 log_tuning(experiment)
             else:
                 mlflow.log_param("tuned_params", experiment.tuned_params_)
@@ -85,12 +85,8 @@ def _log_experiment(experiment: Experiment, parent_name: str, depth: int) -> dic
             # Check if experiment has evaluations
             if hasattr(experiment, "results_") and hasattr(experiment, "estimators_"):
                 # Log cv folds
-                for i, (estimator, result) in enumerate(
-                    zip(experiment.estimators_, _expand_dict(experiment.results_)), 1
-                ):
-                    with mlflow.start_run(
-                        run_name=f"{run_name}.fold-{i}/{len(experiment.estimators_)}", nested=True
-                    ) as cv_run:
+                for i, (estimator, result) in enumerate(zip(experiment.estimators_, _expand_dict(experiment.results_)), 1):
+                    with mlflow.start_run(run_name=f"{run_name}.fold-{i}/{len(experiment.estimators_)}", nested=True) as cv_run:
                         log_run(estimator)
                         log_run_result(result)
 
@@ -99,8 +95,7 @@ def _log_experiment(experiment: Experiment, parent_name: str, depth: int) -> dic
                 # Log cv average
                 with mlflow.start_run(run_name=f"{run_name}.averaged_cv", nested=True) as average_run:
                     average_results = {
-                        key: np.mean(value) if not isinstance(value, list) else 0
-                        for key, value in experiment.results_.items()
+                        key: np.mean(value) if not isinstance(value, list) else 0 for key, value in experiment.results_.items()
                     }
                     log_run_result(average_results)
             else:

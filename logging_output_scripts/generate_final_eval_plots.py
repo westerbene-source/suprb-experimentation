@@ -23,14 +23,14 @@ saga_datasets = {
     "concrete_strength": "Concrete Strength",
     # "energy_cool": "Energy Efficiency Cooling",
     "protein_structure": "Physiochemical Properties of Protein Tertiary Structure",
-    "parkinson_total": "Parkinson's Telemonitoring"
+    "parkinson_total": "Parkinson's Telemonitoring",
 }
 
 datasets_no_pppts = {
     "combined_cycle_power_plant": "Combined Cycle Power Plant",
     "airfoil_self_noise": "Airfoil Self-Noise",
     "concrete_strength": "Concrete Strength",
-    "parkinson_total": "Parkinson's Telemonitoring"
+    "parkinson_total": "Parkinson's Telemonitoring",
 }
 
 
@@ -55,17 +55,11 @@ def mlruns_to_csv(datasets, subdir, normalize):
 
     experiments = mlflow.search_experiments()
 
-    experiment_names = {
-       exp.experiment_id: exp.name
-       for exp in experiments
-    }
+    experiment_names = {exp.experiment_id: exp.name for exp in experiments}
 
     all_runs_df["experiment_name"] = all_runs_df["experiment_id"].map(experiment_names)
 
-    extra_cols = [
-        c for c in ["tags.condition", "tags.rd_method", "tags.pruning", "tags.adaptive"]
-        if c in all_runs_df.columns
-    ]
+    extra_cols = [c for c in ["tags.condition", "tags.rd_method", "tags.pruning", "tags.adaptive"] if c in all_runs_df.columns]
 
     print("Dataset\t\t\tMin MSE\tMax MSE\tMin Complexity\tMax Complexity")
     for dataset in datasets:
@@ -84,26 +78,28 @@ def mlruns_to_csv(datasets, subdir, normalize):
             & (all_runs_df["tags.fold"] == "True")
         ]
         df = df[
-            ["tags.mlflow.runName", "artifact_uri", "run_id", mse, complexity, hypervolume, test_hypervolume, spread, sc_iters]
-            + extra_cols
+            ["tags.mlflow.runName", "artifact_uri", "run_id", mse, complexity, hypervolume, test_hypervolume, spread, sc_iters] + extra_cols
         ].copy()
         df["params.random_state"] = df["artifact_uri"].apply(_read_random_state)
         n_missing_seed = df["params.random_state"].isna().sum()
         if n_missing_seed > 0:
-            print(f"  WARNING: {n_missing_seed} row(s) for {dataset} have no readable random_state "
-                  f"(params.json missing or unreadable at that path) -- these rows will fail seed pairing.")
-        print(f"{dataset}\t\t\t{np.min(df[mse]):.4f}\t{np.max(df[mse]):.4f}\t{np.min(df[complexity]):.4f}\t"
-              f"{np.max(df[complexity]):.4f}")
+            print(
+                f"  WARNING: {n_missing_seed} row(s) for {dataset} have no readable random_state "
+                f"(params.json missing or unreadable at that path) -- these rows will fail seed pairing."
+            )
+        print(
+            f"{dataset}\t\t\t{np.min(df[mse]):.4f}\t{np.max(df[mse]):.4f}\t{np.min(df[complexity]):.4f}\t" f"{np.max(df[complexity]):.4f}"
+        )
 
-        roots = all_runs_df[all_runs_df["tags.mlflow.runName"].str.contains(
-            dataset, case=False, na=False) & (all_runs_df["tags.root"] == 'True')]
+        roots = all_runs_df[
+            all_runs_df["tags.mlflow.runName"].str.contains(dataset, case=False, na=False) & (all_runs_df["tags.root"] == "True")
+        ]
         roots = roots[["tags.mlflow.runName", "artifact_uri", "params.tuned_params"] + extra_cols]
 
         df[mse] *= -1
         if normalize:
             df[mse] = (df[mse] - np.min(df[mse])) / (np.max(df[mse]) - np.min(df[mse]))
-            df[complexity] = (df[complexity] - np.min(df[complexity])) / (
-                    np.max(df[complexity]) - np.min(df[complexity]))
+            df[complexity] = (df[complexity] - np.min(df[complexity])) / (np.max(df[complexity]) - np.min(df[complexity]))
         os.makedirs(f"mlruns_csv/{subdir}", exist_ok=True)
         df.to_csv(f"mlruns_csv/{subdir}/{dataset}_all.csv", index=False)
         roots.to_csv(f"mlruns_csv/{subdir}/{dataset}_roots.csv", index=False)
@@ -216,14 +212,24 @@ def run_main():
                 print(f"WARNING: ttest() failed for {name1} vs {name2} ({type(e).__name__}: {e}) -- continuing.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     final_eval_es_setting = [
-        "diss-graphs/graphs/FINAL_EVAL_ES", final_eval_es, "Configuration", False,
-        "mlruns_csv/FINAL_EVAL_ES", {}, True,
+        "diss-graphs/graphs/FINAL_EVAL_ES",
+        final_eval_es,
+        "Configuration",
+        False,
+        "mlruns_csv/FINAL_EVAL_ES",
+        {},
+        True,
     ]
     final_eval_ns_setting = [
-        "diss-graphs/graphs/FINAL_EVAL_NS", final_eval_ns, "Configuration", False,
-        "mlruns_csv/FINAL_EVAL_NS", {}, True,
+        "diss-graphs/graphs/FINAL_EVAL_NS",
+        final_eval_ns,
+        "Configuration",
+        False,
+        "mlruns_csv/FINAL_EVAL_NS",
+        {},
+        True,
     ]
 
     current_dataset = saga_datasets
